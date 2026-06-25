@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runQualityTrain, runSend, runStrategy, runTrain } from "./actions.ts";
+import { runExecute, runForecast, runQualityTrain, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -192,6 +192,21 @@ async function main() {
       console.log();
       break;
     }
+    case "forecast": {
+      const { forecasts, recommendations } = runForecast(store);
+      console.log(col("\n  Prognoza popytu (trend wg momentum)\n", C.b));
+      if (!forecasts.length) { console.log(col("    — za mało danych", C.dim)); break; }
+      for (const f of forecasts.slice(0, 8)) {
+        const arrow = f.trend === "rising" ? col("▲ rośnie", C.g) : f.trend === "declining" ? col("▼ słabnie", C.r) : col("→ stabilnie", C.dim);
+        console.log(`    ${f.key.padEnd(12)} ${arrow}  momentum ${f.momentum}x  prognoza ${f.predictedNext}/dzień  (slope ${f.slope})`);
+      }
+      if (recommendations.length) {
+        console.log(col("\n  Prealokacja (wyprzedź popyt):", C.b));
+        for (const r of recommendations) console.log(`    ${col(r.action, C.b)} → ${r.target}  ${col(`(${Math.round(r.confidence * 100)}%)`, C.dim)}\n        ${col(r.rationale, C.dim)}`);
+      }
+      console.log();
+      break;
+    }
     case "quality": {
       const model = runQualityTrain(store);
       const caps = Object.values(model.byCapability);
@@ -282,6 +297,7 @@ async function main() {
   mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
   quality              model jakości wykonania (samokalibracja bramki)
   strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji
+  forecast             prognoza popytu + prealokacja (wyprzedź trend)
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]
   version              pokaż wersję

@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, ROOT, strategyOverridesPath, type AgentConfig } from "./config.ts";
 import { computeFunnel, recommend, type Funnel, type Recommendation } from "./strategy.ts";
+import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
 import { effectiveDailyCap } from "./billing.ts";
 import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
@@ -130,6 +131,18 @@ export function runStrategy(store: Store, cfg: AgentConfig, apply?: boolean): St
     }
   }
   return { funnel, recommendations, applied };
+}
+
+export interface ForecastResult {
+  forecasts: Forecast[];
+  recommendations: PreallocRec[];
+}
+
+/** Predictive demand: forecast per-category trend and pre-allocate effort. */
+export function runForecast(store: Store): ForecastResult {
+  const events = store.leadTimeline().map((e) => ({ key: e.category, date: e.date }));
+  const forecasts = forecast(events);
+  return { forecasts, recommendations: prealloc(forecasts) };
 }
 
 /** Train the execution-quality model from client verdicts and persist it. */

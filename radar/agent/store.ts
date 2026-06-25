@@ -222,6 +222,15 @@ export class Store {
       .map((l) => ({ capability: l.executionCapability!, outcome: l.executionOutcome! }));
   }
 
+  /** Per-category timeline (by lead creation day) for demand forecasting. */
+  leadTimeline(): { category: string; source: string; date: string }[] {
+    return this.db.leads.map((l) => ({
+      category: l.signalCategories?.[0] ?? "(brak)",
+      source: l.signalSource ?? "(brak)",
+      date: (l.createdAt ?? "").slice(0, 10),
+    }));
+  }
+
   /** Flatten leads into P&L facts for the strategy meta-optimizer. */
   leadFacts(): LeadFact[] {
     return this.db.leads.map((l) => ({
