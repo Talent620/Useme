@@ -72,17 +72,23 @@ export interface ExecutionSettings {
   enabled: boolean;
   /** Execute won leads automatically at the end of each cycle. */
   autoExecuteOnWon: boolean;
-  /** Self-revision budget per task. */
+  /** Total generation budget per task. */
   maxIterations: number;
   /** Confidence required to auto-deliver (below => queued for human review). */
   minConfidence: number;
+  /** Best-of-N initial drafts (tournament selection). */
+  candidates?: number;
+  /** Keep refining until this score (default 100 = perfection on criteria). */
+  targetScore?: number;
 }
 
 export const DEFAULT_EXECUTION: ExecutionSettings = {
   enabled: true,
   autoExecuteOnWon: true,
-  maxIterations: 3,
+  maxIterations: 5,
   minConfidence: 80,
+  candidates: 2,
+  targetScore: 100,
 };
 
 export interface StrategySettings {

@@ -17,6 +17,7 @@ export interface CapabilityQuality {
   acceptanceRate: number;
   minConfidence: number; // recommended gate threshold
   maxIterations: number; // recommended self-revision budget
+  autoAllowed: boolean; // may auto-deliver (false => always human review)
 }
 
 export interface QualityModel {
@@ -29,9 +30,10 @@ export interface QualityBase {
   minConfidence: number;
   maxIterations: number;
   minSamples?: number;
+  acceptThreshold?: number; // min acceptanceRate to allow auto-delivery
 }
 
-const DEFAULTS: Required<QualityBase> = { minConfidence: 80, maxIterations: 3, minSamples: 3 };
+const DEFAULTS: Required<QualityBase> = { minConfidence: 80, maxIterations: 3, minSamples: 3, acceptThreshold: 0.6 };
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
@@ -51,13 +53,16 @@ export function trainQualityModel(samples: QualitySample[], base: QualityBase = 
   for (const [capability, g] of groups) {
     const acceptanceRate = g.n ? g.accepted / g.n : 1;
     if (g.n < b.minSamples) {
-      byCapability[capability] = { capability, n: g.n, accepted: g.accepted, acceptanceRate, minConfidence: b.minConfidence, maxIterations: b.maxIterations };
+      byCapability[capability] = { capability, n: g.n, accepted: g.accepted, acceptanceRate, minConfidence: b.minConfidence, maxIterations: b.maxIterations, autoAllowed: true };
       continue;
     }
     // The worse the acceptance, the higher we set our own bar.
     const minConfidence = clamp(Math.round(b.minConfidence + (1 - acceptanceRate) * 20), b.minConfidence, 95);
     const maxIterations = b.maxIterations + (acceptanceRate < 0.5 ? 2 : acceptanceRate < 0.8 ? 1 : 0);
-    byCapability[capability] = { capability, n: g.n, accepted: g.accepted, acceptanceRate, minConfidence, maxIterations };
+    // Even a criteria-perfect deliverable goes to human review if clients keep
+    // rejecting this capability (perfect-by-criteria ≠ accepted-by-client).
+    const autoAllowed = acceptanceRate >= (b.acceptThreshold ?? 0.6);
+    byCapability[capability] = { capability, n: g.n, accepted: g.accepted, acceptanceRate, minConfidence, maxIterations, autoAllowed };
   }
 
   return { byCapability, trainedOn: samples.length, updatedAt: now != null ? new Date(now).toISOString() : undefined };
@@ -68,18 +73,20 @@ export function gateOpts(
   model: QualityModel | undefined,
   capabilities: string[],
   base: QualityBase = DEFAULTS,
-): { minConfidence: number; maxIterations: number } {
+): { minConfidence: number; maxIterations: number; blocked: string[] } {
   const b = { ...DEFAULTS, ...base };
   let minConfidence = b.minConfidence;
   let maxIterations = b.maxIterations;
+  const blocked: string[] = [];
   if (model) {
     for (const cap of capabilities) {
       const q = model.byCapability[cap];
       if (q) {
         minConfidence = Math.max(minConfidence, q.minConfidence);
         maxIterations = Math.max(maxIterations, q.maxIterations);
+        if (!q.autoAllowed) blocked.push(cap);
       }
     }
   }
-  return { minConfidence, maxIterations };
+  return { minConfidence, maxIterations, blocked };
 }

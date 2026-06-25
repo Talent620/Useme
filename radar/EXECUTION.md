@@ -47,8 +47,15 @@ Packager → deliverable + confidence + bramka (auto / review)
   CSS, SVG hero + manifest assetów (prompty do generatora obrazów, np. Higgsfield).
 - **Krytyk** (`exec/critic.ts`) — deterministyczna, audytowalna ocena; jego uwagi
   napędzają rewizję (samopoprawę).
-- **Silnik** (`exec/engine.ts`) — pętla plan→produkcja→weryfikacja→rewizja do
-  spełnienia kryteriów lub wyczerpania budżetu iteracji; pakuje deliverable.
+- **Silnik** (`exec/engine.ts`) — dążenie do **perfekcji (100/100)** w trzech krokach:
+  1. **best-of-N** — generuje N kandydatów (różne podejścia) i wybiera najlepszego (turniej),
+  2. **iteracja do celu** — nie zatrzymuje się na „zaliczone" (≥80), rewiduje aż do
+     `targetScore` (domyślnie 100), oddając krytykowi wszystkie uwagi,
+  3. **repair/polish** (`exec/refine.ts`) — deterministycznie domyka resztę:
+     dodaje brakujące sekcje, wplata wszystkie słowa kluczowe, dobija długość,
+     usuwa placeholdery, gwarantuje poprawny JSON → **100 na mierzalnych kryteriach**.
+  Tłumaczenia bez LLM są wyłączone z repair (eskalują do człowieka — perfekcja
+  formalna nie zastąpi brakującego tłumaczenia).
 
 ## Bramka autonomii
 - `confidence` = min. ocena zadań (łańcuch tak mocny jak najsłabsze ogniwo).
@@ -64,9 +71,10 @@ bywają odrzucane:
   większy budżet iteracji (więcej samopoprawy przed wydaniem),
 - wysoka akceptacja → próg bazowy.
 
-Bramka egzekucji konsultuje ten model: ten sam deliverable może być „auto" bez
-historii, a „review" po nauczeniu się, że dana kompetencja bywa odrzucana — czyli
-system samodzielnie kalibruje swoją autonomię na podstawie realnych wyników.
+Bramka egzekucji konsultuje ten model: nawet deliverable **perfekcyjny po
+kryteriach (100/100)** trafia do przeglądu człowieka, jeśli klienci historycznie
+odrzucają daną kompetencję (`autoAllowed=false`) — bo perfekcja formalna ≠
+akceptacja klienta. System samodzielnie kalibruje autonomię na realnych wynikach.
 Trening odpala się automatycznie w cyklu; ręcznie: `quality`.
 
 ## Użycie

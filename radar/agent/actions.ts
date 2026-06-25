@@ -84,7 +84,7 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
       lead.signalCategories ?? [],
       lead.signalLang ?? "pl",
     );
-    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence, quality });
+    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence, quality, candidates: exec.candidates, targetScore: exec.targetScore });
     const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
     writeFileSync(ref, report.deliverable);
     // Also write each artifact in its native format (openable .html, .txt).

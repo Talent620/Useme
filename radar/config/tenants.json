@@ -16,8 +16,10 @@
     "execution": {
       "enabled": true,
       "autoExecuteOnWon": true,
-      "maxIterations": 3,
-      "minConfidence": 80
+      "maxIterations": 5,
+      "minConfidence": 80,
+      "candidates": 2,
+      "targetScore": 100
     }
   },
   "sources": [

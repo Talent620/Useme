@@ -29,6 +29,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Billing Stripe + plany (limity w runtime)** | ✅ **9 testów** ([BILLING.md](./BILLING.md)) |
 | **Samoobsługowy onboarding + proof-of-value** | ✅ **4 testy** (CLI `onboard`, MCP, `/api/signup`) |
 | **🚀 Autonomiczna realizacja zleceń (silnik egzekucji)** | ✅ **8 testów** ([EXECUTION.md](./EXECUTION.md)) |
+| **Perfekcyjne wykonanie: best-of-N + iteracja + repair → 100/100** | ✅ **4 testy** (refine) |
 | **Narzędzia wykonawców: SEO, research z cytowaniami, workflow n8n** | ✅ **13 testów** (`exec/tools/`) |
 | **Graf wielozadaniowy (automation→spec+n8n, ecommerce→landing+treści)** | ✅ |
 | **Orkiestrator: dynamiczna kompozycja narzędzi + generacja obrazu** | ✅ **4 testy** (Higgsfield + fallback SVG) |
