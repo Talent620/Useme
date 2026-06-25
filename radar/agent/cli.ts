@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -280,6 +280,34 @@ async function main() {
       console.log();
       break;
     }
+    case "rank": {
+      const { namespaces } = runRank(store);
+      console.log(col("\n  RL-lite ranking — czego nauczył się agent z realnych wyników\n", C.b));
+      let any = false;
+      for (const { ns, arms } of namespaces) {
+        if (!arms.length) continue;
+        any = true;
+        console.log(col(`  ${ns}:`, C.b));
+        for (const a of arms) {
+          const vc = a.value >= 0.6 ? C.g : a.value >= 0.3 ? C.y : C.dim;
+          console.log(`    ${col(a.value.toFixed(3), vc)}  ${a.arm.padEnd(20)} ${col(`(${a.n} prób)`, C.dim)}`);
+        }
+      }
+      if (!any) console.log(col("    — brak danych (oznacz leady WON/REJECTED: mark <id> WON)", C.dim));
+      console.log();
+      break;
+    }
+    case "price": {
+      const r = runPrice(store, args[0] ?? "");
+      if (!r) return fail(`Brak leada ${args[0]}`);
+      console.log(col(`\n  Rekomendowana cena dla ${args[0]}\n`, C.b));
+      console.log(`  Cena:         ${col(r.recommendedPrice + " zł", C.g)}  (${Math.round(r.fraction * 100)}% budżetu)`);
+      console.log(`  P(wygranej):  ${col(Math.round(r.winProbability * 100) + "%", r.winProbability >= 0.5 ? C.g : C.y)}`);
+      console.log(`  Wartość ocz.: ${col(r.expectedValue + " zł", C.b)}  ·  Marża: ${r.marginPct}%`);
+      console.log(col(`  Podstawa: intent ${r.basis.score}/100, historia win ${Math.round(r.basis.histWinRate * 100)}% (${r.basis.histSamples} prób), konkurencja ${r.basis.competition.toFixed(2)}`, C.dim));
+      console.log();
+      break;
+    }
     case "quality": {
       const model = runQualityTrain(store);
       const caps = Object.values(model.byCapability);
@@ -378,6 +406,8 @@ async function main() {
   crm                  pipeline + follow-upy do wysłania
   strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji
   forecast             prognoza popytu + prealokacja (wyprzedź trend)
+  rank                 RL-lite: czego agent nauczył się z wyników (źródła/kanały/kategorie)
+  price <leadId>       rekomendowana cena + P(wygranej) + wartość oczekiwana
   report               panel operatora: pełny stan + co trzeba zrobić
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]

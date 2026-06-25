@@ -7,6 +7,7 @@ import { dirname } from "node:path";
 import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/core/src/index.ts";
 import type { ExecOutcome, QualityModel, QualitySample } from "./exec/quality.ts";
 import type { LeadFact } from "./strategy.ts";
+import { rank, update as rankUpdate, type RankTable } from "./rank.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -37,6 +38,9 @@ export interface StoredLead extends Lead {
   signalCategories?: string[];
   signalLang?: string;
   signalSource?: string;
+  // Pricing intelligence (computed at lead creation).
+  recommendedPrice?: number;
+  winProbability?: number;
   // Autonomous execution state.
   executionStatus?: "none" | "auto" | "review";
   executionConfidence?: number;
@@ -53,10 +57,11 @@ interface Db {
   sends: { tenantId: string; leadId: string; via: string; at: string }[];
   learned: Record<string, LearnedModel>;
   qualityModel?: QualityModel;
+  rankTables: Record<string, RankTable>;
   sourceState: Record<string, SourceState>;
 }
 
-const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], learned: {}, sourceState: {} };
+const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], learned: {}, rankTables: {}, sourceState: {} };
 
 export class Store {
   private db: Db;
@@ -254,6 +259,19 @@ export class Store {
       executed: Boolean(l.executionStatus),
       executionOutcome: l.executionOutcome,
     }));
+  }
+
+  // -- RL-lite ranking (closed loop: outcomes → learned arm values) --------
+  getRankTable(ns: string): RankTable {
+    return this.db.rankTables[ns] ?? {};
+  }
+  updateRank(ns: string, arm: string, reward: number) {
+    const t = this.db.rankTables[ns] ?? {};
+    rankUpdate(t, arm, reward);
+    this.db.rankTables[ns] = t;
+  }
+  rankedArms(ns: string) {
+    return rank(this.getRankTable(ns));
   }
 
   getQualityModel(): QualityModel | undefined {

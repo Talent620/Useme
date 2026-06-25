@@ -23,7 +23,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **`agent/` — autonomiczny cykl (crawl→score→draft→dostawa)** | ✅ **działa end-to-end, 3 testy** |
 | **GitHub Actions cron (autonomia w chmurze)** | ✅ **`.github/workflows/radar-autonomous.yml`** |
 | **Outreach z bramką + self-improving scoring** | ✅ **27 testów** |
-| **Serwer MCP (agent-native, 10 narzędzi)** | ✅ **`agent/mcp/`, 7 testów** |
+| **Serwer MCP (agent-native, 23 narzędzia)** | ✅ **`agent/mcp/`, 7 testów** |
 | **Realne źródła: robots/rate-limit/warunkowy GET** | ✅ **7 testów** |
 | **Persystencja Postgres/Prisma (swappowalny repo)** | ✅ **3 testy + migracja** ([PERSISTENCE.md](./PERSISTENCE.md)) |
 | **Billing Stripe + plany (limity w runtime)** | ✅ **9 testów** ([BILLING.md](./BILLING.md)) |
@@ -40,6 +40,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Binarki Windows/Ubuntu/Android + auto-update** | ✅ **6 testów** ([INSTALL.md](./INSTALL.md), [Releases](https://github.com/talent620/useme/releases/latest)) |
 | **Panel webowy `serve` (przejrzysty UI, live, akcje)** | ✅ **4 testy** (wbudowany, zero zależności) |
 | **Zaawansowana autonomia: pamięć, multi-agent, CFO, ceny, CRM, intel** | ✅ **8 testów** ([ADVANCED.md](./ADVANCED.md), [AUDIT.md](../AUDIT.md), [ROADMAP.md](../ROADMAP.md)) |
+| **Zamknięta pętla decyzji: cykl wycenia → wynik uczy bandita (rank/price)** | ✅ **5 testów** (`closure.test.ts`, ceny na każdym leadzie, RL-lite z realnych WON/LOST) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

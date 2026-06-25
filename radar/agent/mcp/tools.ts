@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -46,6 +46,8 @@ export const TOOLS: ToolDef[] = [
   { name: "radar_quality", description: "Model jakości wykonania per kompetencja (akceptacja, samokalibrowany próg/iteracje).", inputSchema: obj() },
   { name: "radar_strategy", description: "Agent-CEO: P&L lejka (marża/ROI per kategoria/źródło/tenant) + rekomendacje realokacji. apply=true auto-wyłącza martwe źródła.", inputSchema: obj({ apply: { type: "boolean" } }) },
   { name: "radar_forecast", description: "Prognoza popytu per kategoria (trend/momentum/predykcja next) + prealokacja wyprzedzająca.", inputSchema: obj() },
+  { name: "radar_rank", description: "RL-lite ranking: czego agent nauczył się z realnych wyników (wartość per źródło/kanał/kategoria, EWMA bandit).", inputSchema: obj() },
+  { name: "radar_price", description: "Dynamiczna wycena leada: rekomendowana cena + P(wygranej) + wartość oczekiwana (intent×historia×konkurencja, deterministycznie).", inputSchema: obj({ leadId: { type: "string" } }, ["leadId"]) },
   { name: "radar_report", description: "Panel operatora: pełny stan biznesu (pipeline, P&L, prognoza, jakość, deliverable) + lista 'co trzeba zrobić'.", inputSchema: obj() },
   { name: "radar_board", description: "Zespół agentów (CEO/Sales/Research/Outreach/Execution/QA/Finance/Strategy) nad wspólną pamięcią — widoki + priorytety CEO.", inputSchema: obj() },
   { name: "radar_finance", description: "Agent finansowy: P&L, MRR, marża, CAC, LTV, ROI.", inputSchema: obj() },
@@ -93,7 +95,8 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
         tenant: t.id,
         leads: store.leadsForTenant(t.id, min).slice(0, 25).map((l) => ({
           id: l.id, score: l.score, title: l.signalTitle, url: l.signalUrl,
-          budget: l.signalBudget, status: l.status, outreach: l.outreachStatus ?? "none",
+          budget: l.signalBudget, recommendedPrice: l.recommendedPrice, winProbability: l.winProbability,
+          status: l.status, outreach: l.outreachStatus ?? "none",
         })),
       }));
       return { text: JSON.stringify(out, null, 2) };
@@ -134,6 +137,9 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
       const leadId = arg<string>(args, "leadId") ?? "";
       const status = arg<string>(args, "status") ?? "";
       const ok = store.setLeadStatus(leadId, status as never);
+      // Keep parity with the CLI: closed deals feed memory + the RL-lite bandit.
+      if (ok && status === "WON") recordToMemory(store, leadId, "win");
+      if (ok && status === "REJECTED") recordToMemory(store, leadId, "loss");
       return { text: ok ? `${leadId} -> ${status}` : `Brak leada ${leadId}.`, isError: !ok };
     }
 
@@ -161,6 +167,14 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_forecast":
       return { text: JSON.stringify(runForecast(store), null, 2) };
+
+    case "radar_rank":
+      return { text: JSON.stringify(runRank(store), null, 2) };
+
+    case "radar_price": {
+      const r = runPrice(store, arg<string>(args, "leadId") ?? "");
+      return r ? { text: JSON.stringify(r, null, 2) } : { text: "brak leada", isError: true };
+    }
 
     case "radar_report":
       return { text: runReport(store, cfg, new Date().toISOString()).markdown };

@@ -44,6 +44,18 @@ export function buildReport(store: Store, cfg: AgentConfig, nowISO: string): str
   for (const f of fc.slice(0, 5)) L.push(`- ${f.key}: ${trendIcon(f.trend)} momentum ${f.momentum}x, prognoza ${f.predictedNext}/dzień`);
   L.push("");
 
+  L.push(`## Wycena i ranking (RL-lite)`);
+  const ranked = (["source", "channel", "category"] as const)
+    .map((ns) => ({ ns, arms: store.rankedArms(ns).filter((a) => a.n > 0) }))
+    .filter((x) => x.arms.length);
+  if (ranked.length) {
+    for (const { ns, arms } of ranked) {
+      const top = arms.slice(0, 3).map((a) => `${a.arm} ${a.value.toFixed(2)} (${a.n})`).join(", ");
+      L.push(`- ${ns}: ${top}`);
+    }
+  } else L.push(`- (brak wyników — oznacz leady WON/REJECTED, by uczyć bandita)`);
+  L.push("");
+
   L.push(`## Jakość wykonania`);
   if (quality && Object.keys(quality.byCapability).length) {
     for (const q of Object.values(quality.byCapability)) L.push(`- ${q.capability}: akceptacja ${pct(q.acceptanceRate)} (${q.accepted}/${q.n}) — ${q.autoAllowed ? "auto OK" : "**wymaga przeglądu**"}`);

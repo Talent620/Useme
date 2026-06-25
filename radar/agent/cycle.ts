@@ -10,13 +10,16 @@ import {
   trainModel,
   type Signal,
 } from "../packages/core/src/index.ts";
-import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
+import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, memoryPath, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
 import { runExecute, runQualityTrain, runStrategy } from "./actions.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
 import { Store } from "./store.ts";
+import { Memory } from "./memory.ts";
+import { recommendBid, competitionScore } from "./pricing.ts";
+import { DEFAULT_COSTS } from "./strategy.ts";
 
 export interface CycleMetrics {
   startedAt: string;
@@ -82,6 +85,10 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   // 2) Dedupe within batch, then drop anything already seen in prior runs.
   const fresh = dedupe(collected).filter((s) => !store.hasSeen(s.dedupeKey));
   let leadsCreated = 0;
+  // Competition pressure per category (how crowded this batch is) for pricing.
+  const catCounts = new Map<string, number>();
+  for (const s of fresh) for (const c of s.categories) catCounts.set(c, (catCounts.get(c) ?? 0) + 1);
+  const memory = new Memory(memoryPath());
   // Attach each tenant's learned overlay so scoring reflects past outcomes.
   const learn = cfg.settings.learn ?? DEFAULT_LEARN;
   const icps = cfg.tenants.map((t) => {
@@ -99,8 +106,18 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
       const [lead] = matchSignal(withId, [icp], { now, threshold: cfg.settings.threshold });
       if (!lead) continue;
       const draft = buildProposal(withId, tenant.sender);
+      // Dynamic pricing: P(win) + recommended bid from history + competition.
+      const cat = sig.categories[0] ?? "(brak)";
+      const hist = memory.winRate({ category: cat, source: sig.sourceName });
+      const bid = recommendBid(sig.budget, DEFAULT_COSTS.perExecution, {
+        score: lead.score,
+        histWinRate: hist.n >= 3 ? hist.rate : 0.35,
+        competition: competitionScore(catCounts.get(cat) ?? 0),
+      });
       const stored = store.upsertLead({
         ...lead,
+        recommendedPrice: bid.price,
+        winProbability: bid.winProbability,
         signalTitle: sig.title,
         signalUrl: sig.url,
         signalBudget: sig.budget,
