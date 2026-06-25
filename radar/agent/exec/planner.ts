@@ -86,6 +86,7 @@ const INSTRUCTION: Record<Capability, string> = {
 function capabilitiesFor(job: Job): Capability[] {
   const c = new Set(job.categories);
   if (c.has("automation")) return ["spec", "scaffold"]; // spec + importowalny workflow
+  if (c.has("seo") || c.has("ads")) return ["audit"]; // audyt ma priorytet nad ecommerce
   if (c.has("ecommerce")) return ["landing", "writer"]; // strona + treści/opisy
   return [pickCapability(job)];
 }

@@ -8,6 +8,7 @@ import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, ROOT, strategyOverridesPath, type AgentConfig } from "./config.ts";
 import { computeFunnel, recommend, type Funnel, type Recommendation } from "./strategy.ts";
 import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
+import { buildReport } from "./report.ts";
 import { effectiveDailyCap } from "./billing.ts";
 import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
@@ -131,6 +132,16 @@ export function runStrategy(store: Store, cfg: AgentConfig, apply?: boolean): St
     }
   }
   return { funnel, recommendations, applied };
+}
+
+/** Build the operator dashboard and persist it to data/report.md. */
+export function runReport(store: Store, cfg: AgentConfig, nowISO: string): { markdown: string; ref: string } {
+  const markdown = buildReport(store, cfg, nowISO);
+  const dir = process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data");
+  mkdirSync(dir, { recursive: true });
+  const ref = resolve(dir, "report.md");
+  writeFileSync(ref, markdown);
+  return { markdown, ref };
 }
 
 export interface ForecastResult {

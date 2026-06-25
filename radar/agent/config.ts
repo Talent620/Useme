@@ -163,6 +163,11 @@ export function loadConfig(path?: string): AgentConfig {
       /* malformed overlay ignored */
     }
   }
+  // Live mode (e.g. in CI): force-enable named real sources without editing config.
+  if (process.env.RADAR_LIVE === "1") {
+    const live = new Set((process.env.RADAR_LIVE_SOURCES ?? "useme").split(",").map((x) => x.trim()));
+    for (const s of cfg.sources) if (live.has(s.name)) s.enabled = true;
+  }
   // Merge self-service signups (overlay), deduped by id. Base config wins on clash.
   const overlay = tenantsOverlayPath();
   if (existsSync(overlay)) {

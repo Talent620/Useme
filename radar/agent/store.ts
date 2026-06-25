@@ -231,6 +231,17 @@ export class Store {
     }));
   }
 
+  /** Executed leads with their deliverable references (for the operator report). */
+  deliverables(): { id: string; tenantId: string; title: string; gate?: string; confidence?: number; outcome?: string; capability?: string; ref?: string }[] {
+    return this.db.leads
+      .filter((l) => l.deliverableRef)
+      .map((l) => ({
+        id: l.id, tenantId: l.tenantId, title: l.signalTitle,
+        gate: l.executionStatus, confidence: l.executionConfidence,
+        outcome: l.executionOutcome, capability: l.executionCapability, ref: l.deliverableRef,
+      }));
+  }
+
   /** Flatten leads into P&L facts for the strategy meta-optimizer. */
   leadFacts(): LeadFact[] {
     return this.db.leads.map((l) => ({

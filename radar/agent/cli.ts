@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runForecast, runQualityTrain, runSend, runStrategy, runTrain } from "./actions.ts";
+import { runExecute, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -192,6 +192,12 @@ async function main() {
       console.log();
       break;
     }
+    case "report": {
+      const { markdown, ref } = runReport(store, loadConfig(), new Date().toISOString());
+      console.log(markdown);
+      console.error(col(`\n  → zapisano: ${ref}`, C.dim));
+      break;
+    }
     case "forecast": {
       const { forecasts, recommendations } = runForecast(store);
       console.log(col("\n  Prognoza popytu (trend wg momentum)\n", C.b));
@@ -298,6 +304,7 @@ async function main() {
   quality              model jakości wykonania (samokalibracja bramki)
   strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji
   forecast             prognoza popytu + prealokacja (wyprzedź trend)
+  report               panel operatora: pełny stan + co trzeba zrobić
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]
   version              pokaż wersję

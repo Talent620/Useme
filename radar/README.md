@@ -36,6 +36,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Samokalibracja jakości wykonania (2. pętla uczenia)** | ✅ **4 testy** (system sam podnosi poprzeczkę) |
 | **Agent-CEO: P&L lejka + autonomiczna realokacja** | ✅ **4 testy** (rozwijaj/wygaś/upsell/ceny, auto-apply) |
 | **Pętla predykcyjna popytu (prognoza + prealokacja)** | ✅ **6 testów** (Holt + regresja + momentum) |
+| **Panel operatora (pipeline+P&L+prognoza+jakość+TODO) + live w CI** | ✅ **2 testy** (`report`) |
 | **Binarki Windows/Ubuntu + auto-update** | ✅ **6 testów** ([INSTALL.md](./INSTALL.md), [Releases](https://github.com/talent620/useme/releases/latest)) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |

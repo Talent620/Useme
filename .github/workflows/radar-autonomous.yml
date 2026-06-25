@@ -46,9 +46,15 @@ jobs:
           restore-keys: |
             radar-state-
 
-      - name: Run one autonomous cycle
+      - name: Run one autonomous cycle (full chain on live sources)
         working-directory: radar
+        env:
+          RADAR_LIVE: "1"
         run: node agent/cli.ts once
+
+      - name: Generate operator report
+        working-directory: radar
+        run: node agent/cli.ts report > /dev/null && echo "report generated"
 
       # Wysyła TYLKO zaakceptowane leady. Przy outreach.autoApprove=false to
       # bezpieczny no-op aż zatwierdzisz (gałąź akceptacji). Ustaw autoApprove=true
@@ -81,5 +87,7 @@ jobs:
           path: |
             radar/data/digests/
             radar/data/outbox/
+            radar/data/deliverables/
+            radar/data/report.md
           if-no-files-found: ignore
           retention-days: 14
