@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/core/src/index.ts";
 import type { ExecOutcome, QualityModel, QualitySample } from "./exec/quality.ts";
+import type { LeadFact } from "./strategy.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -35,6 +36,7 @@ export interface StoredLead extends Lead {
   signalBody?: string;
   signalCategories?: string[];
   signalLang?: string;
+  signalSource?: string;
   // Autonomous execution state.
   executionStatus?: "none" | "auto" | "review";
   executionConfidence?: number;
@@ -218,6 +220,20 @@ export class Store {
     return this.db.leads
       .filter((l) => l.executionOutcome && l.executionCapability)
       .map((l) => ({ capability: l.executionCapability!, outcome: l.executionOutcome! }));
+  }
+
+  /** Flatten leads into P&L facts for the strategy meta-optimizer. */
+  leadFacts(): LeadFact[] {
+    return this.db.leads.map((l) => ({
+      category: l.signalCategories?.[0] ?? "(brak)",
+      source: l.signalSource ?? "(brak)",
+      tenantId: l.tenantId,
+      status: l.status,
+      budget: l.signalBudget,
+      sent: l.outreachStatus === "sent",
+      executed: Boolean(l.executionStatus),
+      executionOutcome: l.executionOutcome,
+    }));
   }
 
   getQualityModel(): QualityModel | undefined {

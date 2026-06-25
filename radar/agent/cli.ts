@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runQualityTrain, runSend, runTrain } from "./actions.ts";
+import { runExecute, runQualityTrain, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -168,6 +168,30 @@ async function main() {
       console.log(ok ? col(`✓ Wykonanie ${leadId} -> ${outcome}`, C.g) : col(`Brak leada ${leadId}`, C.r));
       break;
     }
+    case "strategy": {
+      const cfg = loadConfig();
+      const apply = parseFlags(args).apply !== undefined;
+      const { funnel, recommendations, applied } = runStrategy(store, cfg, apply || undefined);
+      const t = funnel.totals;
+      console.log(col("\n  Agent-CEO — P&L lejka\n", C.b));
+      console.log(`  Leady: ${t.leads}  ·  Wygrane: ${t.won}  ·  Przychód: ${col(t.revenue + " zł", C.g)}  ·  Koszt: ${t.cost} zł  ·  Marża: ${col(t.margin + " zł", t.margin >= 0 ? C.g : C.r)}`);
+      const top = funnel.byCategory.slice(0, 5);
+      if (top.length) {
+        console.log(col("\n  Wg kategorii (marża / ROI):", C.b));
+        for (const s of top) console.log(`    ${s.key.padEnd(12)} marża ${String(s.margin).padStart(7)} zł  ROI ${s.roi}x  (win ${Math.round(s.winRate * 100)}%, akcept ${Math.round(s.acceptanceRate * 100)}%)`);
+      }
+      console.log(col("\n  Rekomendacje (priorytet wg wpływu):", C.b));
+      if (!recommendations.length) console.log(col("    — brak (za mało danych)", C.dim));
+      for (const r of recommendations.slice(0, 8)) {
+        const tag = r.autoApplicable ? col("[auto]", C.g) : col("[ręczne]", C.y);
+        console.log(`    ${tag} ${col(r.action, C.b)} → ${r.target}  (+${r.expectedImpactPln} zł, ${Math.round(r.confidence * 100)}%)`);
+        console.log(col(`        ${r.rationale}`, C.dim));
+      }
+      if (applied.length) console.log(col(`\n  ✓ Auto-zastosowano: wyłączono źródła ${applied.join(", ")}`, C.g));
+      else console.log(col("\n  (dodaj --apply aby auto-zastosować bezpieczne ruchy)", C.dim));
+      console.log();
+      break;
+    }
     case "quality": {
       const model = runQualityTrain(store);
       const caps = Object.values(model.byCapability);
@@ -257,6 +281,7 @@ async function main() {
   execute              autonomicznie zrealizuj wygrane zlecenia (deliverable)
   mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
   quality              model jakości wykonania (samokalibracja bramki)
+  strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]
   version              pokaż wersję

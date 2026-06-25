@@ -52,6 +52,7 @@ export interface AgentConfig {
     outreach?: OutreachSettings;
     learn?: LearnSettings;
     execution?: ExecutionSettings;
+    strategy?: StrategySettings;
   };
   sources: SourceDef[];
   tenants: TenantDef[];
@@ -83,6 +84,16 @@ export const DEFAULT_EXECUTION: ExecutionSettings = {
   maxIterations: 3,
   minConfidence: 80,
 };
+
+export interface StrategySettings {
+  /** Auto-apply safe reallocation actions (e.g. disable dead sources). */
+  autoApply: boolean;
+}
+export const DEFAULT_STRATEGY: StrategySettings = { autoApply: false };
+
+export function strategyOverridesPath(): string {
+  return resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "strategy-overrides.json");
+}
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -135,6 +146,17 @@ function resolveConfigFile(path?: string): string {
 export function loadConfig(path?: string): AgentConfig {
   const file = resolveConfigFile(path);
   const cfg = JSON.parse(readFileSync(file, "utf8")) as AgentConfig;
+  // Strategy overlay: the agent-CEO can disable dead sources (reversible).
+  const ovPath = strategyOverridesPath();
+  if (existsSync(ovPath)) {
+    try {
+      const ov = JSON.parse(readFileSync(ovPath, "utf8")) as { sourcesDisabled?: string[] };
+      const disabled = new Set(ov.sourcesDisabled ?? []);
+      for (const s of cfg.sources) if (disabled.has(s.name)) s.enabled = false;
+    } catch {
+      /* malformed overlay ignored */
+    }
+  }
   // Merge self-service signups (overlay), deduped by id. Base config wins on clash.
   const overlay = tenantsOverlayPath();
   if (existsSync(overlay)) {

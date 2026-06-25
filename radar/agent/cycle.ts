@@ -12,7 +12,7 @@ import {
 } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
-import { runExecute, runQualityTrain } from "./actions.ts";
+import { runExecute, runQualityTrain, runStrategy } from "./actions.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -107,6 +107,7 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         signalBody: sig.body,
         signalCategories: sig.categories,
         signalLang: sig.lang,
+        signalSource: sig.sourceName,
         draftSubject: draft.subject,
         draftBody: draft.body,
       });
@@ -150,6 +151,8 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
     // Recalibrate the quality bar from accumulated client verdicts.
     runQualityTrain(store, { minConfidence: exec.minConfidence, maxIterations: exec.maxIterations });
   }
+  // Agent-CEO: reallocate effort (auto-applies safe moves only if configured).
+  if (cfg.settings.strategy?.autoApply) runStrategy(store, cfg);
 
   store.save();
   return {

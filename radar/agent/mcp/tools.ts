@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { runExecute, runQualityTrain, runSend, runTrain } from "../actions.ts";
+import { runExecute, runQualityTrain, runSend, runStrategy, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -43,6 +43,7 @@ export const TOOLS: ToolDef[] = [
     inputSchema: obj({ leadId: { type: "string" }, outcome: { type: "string", enum: ["ACCEPTED", "REVISION", "REJECTED"] } }, ["leadId", "outcome"]),
   },
   { name: "radar_quality", description: "Model jakości wykonania per kompetencja (akceptacja, samokalibrowany próg/iteracje).", inputSchema: obj() },
+  { name: "radar_strategy", description: "Agent-CEO: P&L lejka (marża/ROI per kategoria/źródło/tenant) + rekomendacje realokacji. apply=true auto-wyłącza martwe źródła.", inputSchema: obj({ apply: { type: "boolean" } }) },
   { name: "radar_run_cycle", description: "Uruchom jeden pełny cykl: crawl→enrich→score→draft→dostawa.", inputSchema: obj() },
   {
     name: "radar_onboard",
@@ -143,6 +144,9 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_quality":
       return { text: JSON.stringify(runQualityTrain(store), null, 2) };
+
+    case "radar_strategy":
+      return { text: JSON.stringify(runStrategy(store, cfg, arg<boolean>(args, "apply")), null, 2) };
 
     case "radar_run_cycle": {
       const m = await runCycle(store, cfg, Date.now());

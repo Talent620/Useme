@@ -33,7 +33,7 @@ node agent/mcp/server.ts        # lub: pnpm mcp
 ```
 Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 
-## Narzędzia (14)
+## Narzędzia (15)
 
 | Narzędzie | Działanie |
 |---|---|
@@ -51,6 +51,7 @@ Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 | `radar_execute` | autonomicznie zrealizuj wygrane zlecenia (deliverable + pewność) |
 | `radar_mark_exec` | werdykt klienta o deliverable (ACCEPTED/REVISION/REJECTED) |
 | `radar_quality` | model jakości wykonania — samokalibracja bramki per kompetencja |
+| `radar_strategy` | agent-CEO: P&L lejka + rekomendacje realokacji (`apply` auto-wyłącza martwe źródła) |
 
 ## Przykładowy przepływ w rozmowie z agentem
 > „Uruchom cykl, pokaż leady demo-wp powyżej 80, zaakceptuj najlepszy i wyślij."

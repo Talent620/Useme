@@ -33,6 +33,8 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Graf wielozadaniowy (automation→spec+n8n, ecommerce→landing+treści)** | ✅ |
 | **Orkiestrator: dynamiczna kompozycja narzędzi + generacja obrazu** | ✅ **4 testy** (Higgsfield + fallback SVG) |
 | **Samokalibracja jakości wykonania (2. pętla uczenia)** | ✅ **4 testy** (system sam podnosi poprzeczkę) |
+| **Agent-CEO: P&L lejka + autonomiczna realokacja** | ✅ **4 testy** (rozwijaj/wygaś/upsell/ceny, auto-apply) |
+| **Binarki Windows/Ubuntu + auto-update** | ✅ **6 testów** ([INSTALL.md](./INSTALL.md), [Releases](https://github.com/talent620/useme/releases/latest)) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

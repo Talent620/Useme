@@ -2,10 +2,11 @@
 // surfaces never diverge. Each function takes a Store + config, mutates state,
 // persists, and returns a plain result object (easy to render or serialize).
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { trainModel } from "../packages/core/src/index.ts";
-import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, ROOT, type AgentConfig } from "./config.ts";
+import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, ROOT, strategyOverridesPath, type AgentConfig } from "./config.ts";
+import { computeFunnel, recommend, type Funnel, type Recommendation } from "./strategy.ts";
 import { effectiveDailyCap } from "./billing.ts";
 import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
@@ -99,6 +100,36 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
   }
   store.save();
   return { executed: items.length, auto, review: reviewN, items };
+}
+
+export interface StrategyResult {
+  funnel: Funnel;
+  recommendations: Recommendation[];
+  applied: string[]; // sources auto-disabled this run
+}
+
+/** Agent-CEO: compute P&L, recommend reallocation, optionally auto-apply safe moves. */
+export function runStrategy(store: Store, cfg: AgentConfig, apply?: boolean): StrategyResult {
+  const funnel = computeFunnel(store.leadFacts());
+  const recommendations = recommend(funnel, { tenants: cfg.tenants.map((t) => ({ id: t.id, plan: t.plan })) });
+
+  const doApply = apply ?? cfg.settings.strategy?.autoApply ?? DEFAULT_STRATEGY.autoApply;
+  const applied: string[] = [];
+  if (doApply) {
+    const toDisable = recommendations.filter((r) => r.action === "disable_source" && r.autoApplicable).map((r) => r.target);
+    if (toDisable.length) {
+      const path = strategyOverridesPath();
+      let ov: { sourcesDisabled?: string[] } = {};
+      if (existsSync(path)) {
+        try { ov = JSON.parse(readFileSync(path, "utf8")); } catch { ov = {}; }
+      }
+      const set = new Set(ov.sourcesDisabled ?? []);
+      for (const name of toDisable) { if (!set.has(name)) { set.add(name); applied.push(name); } }
+      mkdirSync(resolve(path, ".."), { recursive: true });
+      writeFileSync(path, JSON.stringify({ sourcesDisabled: [...set] }, null, 2));
+    }
+  }
+  return { funnel, recommendations, applied };
 }
 
 /** Train the execution-quality model from client verdicts and persist it. */
