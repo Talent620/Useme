@@ -9,7 +9,7 @@ import {
   toSignal,
   type Signal,
 } from "../packages/core/src/index.ts";
-import { loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
+import { DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -21,6 +21,7 @@ export interface CycleMetrics {
   uniqueFresh: number;
   newSignals: number;
   leadsCreated: number;
+  queuedForOutreach: number;
   digests: { tenant: string; leads: number; ref: string }[];
   durationMs: number;
 }
@@ -28,8 +29,10 @@ export interface CycleMetrics {
 export async function runCycle(store: Store, cfg: AgentConfig, now: number): Promise<CycleMetrics> {
   const startedAt = new Date(now).toISOString();
   const t0 = performance.now();
+  const outreach = cfg.settings.outreach ?? DEFAULT_OUTREACH;
   const sourcesMeta: CycleMetrics["sources"] = [];
   const collected: Signal[] = [];
+  let queuedForOutreach = 0;
 
   // 1) Crawl + normalize every enabled source.
   for (const src of cfg.sources.filter((s) => s.enabled)) {
@@ -70,7 +73,7 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
       const [lead] = matchSignal(withId, [icp], { now, threshold: cfg.settings.threshold });
       if (!lead) continue;
       const draft = buildProposal(withId, tenant.sender);
-      store.upsertLead({
+      const stored = store.upsertLead({
         ...lead,
         signalTitle: sig.title,
         signalUrl: sig.url,
@@ -79,6 +82,10 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         draftBody: draft.body,
       });
       leadsCreated++;
+      // High-confidence leads enter the outreach pipeline (queued or auto-approved).
+      if (outreach.enabled && stored.score >= outreach.threshold) {
+        if (store.queueOutreach(stored.id, outreach.autoApprove)) queuedForOutreach++;
+      }
     }
   }
 
@@ -99,6 +106,7 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
     uniqueFresh: fresh.length,
     newSignals: fresh.length,
     leadsCreated,
+    queuedForOutreach,
     digests,
     durationMs: Math.round(performance.now() - t0),
   };

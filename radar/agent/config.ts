@@ -23,11 +23,34 @@ export interface TenantDef {
   icp: Omit<ICP, "id" | "tenantId">;
 }
 
+export interface OutreachSettings {
+  /** Master switch for the outreach pipeline. */
+  enabled: boolean;
+  /** Minimum lead score to enqueue for outreach. */
+  threshold: number;
+  /** If true, queued leads are auto-approved (skip human gate). Use with care. */
+  autoApprove: boolean;
+  /** Max sends per tenant per rolling 24h (deliverability/safety). */
+  dailyCapPerTenant: number;
+}
+
 export interface AgentConfig {
-  settings: { intervalMinutes: number; threshold: number; maxLeadsPerDigest: number };
+  settings: {
+    intervalMinutes: number;
+    threshold: number;
+    maxLeadsPerDigest: number;
+    outreach?: OutreachSettings;
+  };
   sources: SourceDef[];
   tenants: TenantDef[];
 }
+
+export const DEFAULT_OUTREACH: OutreachSettings = {
+  enabled: true,
+  threshold: 75,
+  autoApprove: false,
+  dailyCapPerTenant: 20,
+};
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

@@ -50,6 +50,16 @@ jobs:
         working-directory: radar
         run: node agent/cli.ts once
 
+      # Wysyła TYLKO zaakceptowane leady. Przy outreach.autoApprove=false to
+      # bezpieczny no-op aż zatwierdzisz (gałąź akceptacji). Ustaw autoApprove=true
+      # w config/tenants.json + skonfiguruj kanał (RESEND/WEBHOOK), by w pełni auto.
+      - name: Send approved outreach
+        working-directory: radar
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+        run: node agent/cli.ts send
+
       - name: Show status
         working-directory: radar
         run: node agent/cli.ts status
@@ -62,12 +72,14 @@ jobs:
           path: radar/data
           key: radar-state-${{ github.run_id }}
 
-      # Digesty jako artefakt do pobrania z zakładki Actions.
-      - name: Upload digests
+      # Digesty + gotowe wiadomości jako artefakt do pobrania z zakładki Actions.
+      - name: Upload digests & outbox
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: radar-digests-${{ github.run_id }}
-          path: radar/data/digests/
+          name: radar-output-${{ github.run_id }}
+          path: |
+            radar/data/digests/
+            radar/data/outbox/
           if-no-files-found: ignore
           retention-days: 14

@@ -2,7 +2,13 @@
   "settings": {
     "intervalMinutes": 30,
     "threshold": 45,
-    "maxLeadsPerDigest": 15
+    "maxLeadsPerDigest": 15,
+    "outreach": {
+      "enabled": true,
+      "threshold": 75,
+      "autoApprove": false,
+      "dailyCapPerTenant": 20
+    }
   },
   "sources": [
     { "name": "sample", "kind": "job_board", "feed": "file:./config/sample-feed.xml", "enabled": true },

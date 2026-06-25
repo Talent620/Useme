@@ -6,6 +6,9 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Lead, Signal } from "../packages/core/src/index.ts";
 
+/** Outreach lifecycle, separate from the sales outcome in `status`. */
+export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
+
 export interface StoredLead extends Lead {
   id: string;
   signalTitle: string;
@@ -15,6 +18,9 @@ export interface StoredLead extends Lead {
   draftBody?: string;
   status: "NEW" | "DELIVERED" | "SENT" | "REPLIED" | "WON" | "REJECTED";
   delivered: boolean;
+  outreachStatus?: OutreachStatus;
+  sentAt?: string;
+  sentVia?: string;
 }
 
 interface Db {
@@ -22,10 +28,11 @@ interface Db {
   seenSignals: Record<string, { id: string; firstSeen: string }>;
   leads: StoredLead[];
   deliveries: { id: string; tenantId: string; leadIds: string[]; channel: string; at: string }[];
+  sends: { tenantId: string; leadId: string; via: string; at: string }[];
   sourceState: Record<string, { lastRunAt?: string; lastError?: string; healthy: boolean }>;
 }
 
-const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sourceState: {} };
+const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], sourceState: {} };
 
 export class Store {
   private db: Db;
@@ -111,18 +118,72 @@ export class Store {
     return true;
   }
 
+  // -- outreach lifecycle -------------------------------------------------
+
+  /** Queue a lead for outreach (or auto-approve). No-op if already in pipeline. */
+  queueOutreach(leadId: string, autoApprove: boolean): boolean {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (!l) return false;
+    const cur = l.outreachStatus ?? "none";
+    if (cur === "none") {
+      l.outreachStatus = autoApprove ? "approved" : "queued";
+      return true;
+    }
+    return false;
+  }
+
+  /** Leads awaiting a human decision or approved-but-not-yet-sent. */
+  outbox(filter?: OutreachStatus): StoredLead[] {
+    const want = filter ? [filter] : ["queued", "approved"];
+    return this.db.leads
+      .filter((l) => want.includes(l.outreachStatus ?? "none"))
+      .sort((a, b) => b.score - a.score);
+  }
+
+  setOutreach(leadId: string, status: OutreachStatus): boolean {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (!l) return false;
+    l.outreachStatus = status;
+    this.save();
+    return true;
+  }
+
+  /** Mark an approved lead as sent and log it for the daily cap. */
+  recordSend(tenantId: string, leadId: string, via: string, now: string) {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (l) {
+      l.outreachStatus = "sent";
+      l.sentAt = now;
+      l.sentVia = via;
+      if (l.status === "NEW" || l.status === "DELIVERED") l.status = "SENT";
+    }
+    this.db.sends.push({ tenantId, leadId, via, at: now });
+  }
+
+  /** Count sends for a tenant since an ISO timestamp (daily-cap enforcement). */
+  sentCountSince(tenantId: string, sinceISO: string): number {
+    return this.db.sends.filter((s) => s.tenantId === tenantId && s.at >= sinceISO).length;
+  }
+
   setSourceState(name: string, state: { lastRunAt?: string; lastError?: string; healthy: boolean }) {
     this.db.sourceState[name] = state;
   }
 
   stats() {
     const byStatus: Record<string, number> = {};
-    for (const l of this.db.leads) byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+    const byOutreach: Record<string, number> = {};
+    for (const l of this.db.leads) {
+      byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+      const o = l.outreachStatus ?? "none";
+      byOutreach[o] = (byOutreach[o] ?? 0) + 1;
+    }
     return {
       signalsSeen: Object.keys(this.db.seenSignals).length,
       leads: this.db.leads.length,
       deliveries: this.db.deliveries.length,
+      sends: this.db.sends.length,
       byStatus,
+      byOutreach,
       sources: this.db.sourceState,
     };
   }

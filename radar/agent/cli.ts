@@ -8,9 +8,10 @@
 //   node agent/cli.ts draft <leadId>   # print the ready-to-send draft
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
-import { loadConfig } from "./config.ts";
+import { DEFAULT_OUTREACH, loadConfig } from "./config.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
+import { sendOutreach } from "./outreach.ts";
 import { Store } from "./store.ts";
 
 const C = { dim: "\x1b[2m", b: "\x1b[1m", g: "\x1b[32m", y: "\x1b[33m", r: "\x1b[31m", x: "\x1b[0m" };
@@ -28,6 +29,7 @@ async function main() {
       console.log(`  Źródła:        ${m.sources.map((s) => `${s.name}(${s.ok ? s.raw : "ERR"})`).join(", ")}`);
       console.log(`  Nowe sygnały:  ${m.newSignals}`);
       console.log(`  Nowe leady:    ${col(String(m.leadsCreated), C.b)}`);
+      console.log(`  Do outreachu:  ${col(String(m.queuedForOutreach), C.y)}  ${col("(node agent/cli.ts outbox)", C.dim)}`);
       console.log(`  Digesty:       ${m.digests.map((d) => `${d.tenant}:${d.leads}`).join(", ") || "—"}`);
       console.log(col(`  Czas: ${m.durationMs} ms`, C.dim));
       for (const d of m.digests) console.log(col(`  → ${d.ref}`, C.dim));
@@ -42,7 +44,9 @@ async function main() {
       console.log(`  Sygnałów widzianych:  ${s.signalsSeen}`);
       console.log(`  Leadów łącznie:       ${s.leads}`);
       console.log(`  Dostaw:               ${s.deliveries}`);
+      console.log(`  Wysłanych ofert:      ${col(String(s.sends), C.b)}`);
       console.log(`  Wg statusu:           ${Object.entries(s.byStatus).map(([k, v]) => `${k}:${v}`).join(", ") || "—"}`);
+      console.log(`  Outreach:             ${Object.entries(s.byOutreach).filter(([k]) => k !== "none").map(([k, v]) => `${k}:${v}`).join(", ") || "—"}`);
       console.log(col("\n  Zdrowie źródeł:", C.b));
       for (const [name, st] of Object.entries(s.sources)) {
         const mark = st.healthy ? col("●", C.g) : col("●", C.r);
@@ -79,6 +83,67 @@ async function main() {
       console.log(ok ? col(`✓ ${leadId} -> ${status}`, C.g) : col(`Brak leada ${leadId}`, C.r));
       break;
     }
+    case "outbox": {
+      const pending = store.outbox();
+      if (!pending.length) {
+        console.log(col("  Skrzynka pusta — brak leadów do wysłania.", C.dim));
+        break;
+      }
+      console.log(col(`\n  Do wysłania (${pending.length}):\n`, C.b));
+      for (const l of pending) {
+        const sc = l.score >= 85 ? C.g : C.y;
+        const flag = l.outreachStatus === "approved" ? col("✓ zaakceptowany", C.g) : col("⏳ czeka", C.y);
+        console.log(`    ${col(`[${l.score}]`, sc)} ${l.id}  ${l.signalTitle}  ${flag}`);
+      }
+      console.log(col("\n  approve <id> | reject <id> | approve all | send\n", C.dim));
+      break;
+    }
+    case "approve": {
+      if (args[0] === "all") {
+        let n = 0;
+        for (const l of store.outbox("queued")) { store.setOutreach(l.id, "approved"); n++; }
+        console.log(col(`✓ Zaakceptowano ${n} leadów`, C.g));
+      } else {
+        const ok = store.setOutreach(args[0], "approved");
+        console.log(ok ? col(`✓ ${args[0]} zaakceptowany`, C.g) : col(`Brak leada ${args[0]}`, C.r));
+      }
+      break;
+    }
+    case "reject": {
+      const ok = store.setOutreach(args[0], "skipped");
+      console.log(ok ? col(`✓ ${args[0]} pominięty`, C.y) : col(`Brak leada ${args[0]}`, C.r));
+      break;
+    }
+    case "send": {
+      const cfg = loadConfig();
+      const out = cfg.settings.outreach ?? DEFAULT_OUTREACH;
+      const approved = store.outbox("approved");
+      if (!approved.length) { console.log(col("  Brak zaakceptowanych leadów do wysłania.", C.dim)); break; }
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const byTenant = new Map<string, typeof approved>();
+      for (const l of approved) {
+        const arr = byTenant.get(l.tenantId) ?? [];
+        arr.push(l);
+        byTenant.set(l.tenantId, arr);
+      }
+      let sent = 0, capped = 0;
+      for (const [tenantId, leads] of byTenant) {
+        const tenant = cfg.tenants.find((t) => t.id === tenantId);
+        if (!tenant) continue;
+        let used = store.sentCountSince(tenantId, since);
+        for (const l of leads) {
+          if (used >= out.dailyCapPerTenant) { capped++; continue; }
+          const now = new Date().toISOString();
+          const res = await sendOutreach(tenant, l, now);
+          store.recordSend(tenantId, l.id, res.via, now);
+          used++; sent++;
+          console.log(`  ${col("→", C.g)} ${l.id} via ${res.via}  ${col(res.ref, C.dim)}`);
+        }
+      }
+      store.save();
+      console.log(col(`\n✓ Wysłano ${sent}${capped ? `, wstrzymano ${capped} (dzienny limit)` : ""}`, C.g));
+      break;
+    }
     default:
       console.log(`RadarPL agent. Komendy:
   once                 jeden cykl teraz
@@ -86,6 +151,10 @@ async function main() {
   status               statystyki + zdrowie źródeł
   leads [tenantId]     lista leadów
   draft <leadId>       pokaż gotowy draft wiadomości
+  outbox               leady czekające na wysłanie (bramka akceptacji)
+  approve <id>|all     zaakceptuj lead(y) do wysłania
+  reject <id>          pomiń lead w outreachu
+  send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)`);
   }
 }

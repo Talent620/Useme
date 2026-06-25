@@ -19,10 +19,37 @@ cykle są idempotentne (ten sam sygnał nigdy nie tworzy dwóch leadów ani dwó
 | Ocena intencji 0–100 wg Twojego ICP | 🤖 agent |
 | Wygenerowanie draftu pierwszej wiadomości | 🤖 agent |
 | Dostawa digestu (plik/webhook/Slack/e-mail) | 🤖 agent |
+| Zakolejkowanie wysokopunktowych leadów do outreachu | 🤖 agent |
+| **Akceptacja wysyłki (bramka)** | 🧑 Ty (lub `autoApprove:true`) |
+| Wysłanie zaakceptowanej oferty + limit dzienny | 🤖 agent |
 | Dodanie/zmiana źródeł i ICP | 🧑 Ty (raz, w `config/tenants.json`) |
-| Faktyczne wysłanie oferty do klienta | 🧑 Ty (lub auto z bramką akceptacji) |
 
 Człowiek konfiguruje raz i akceptuje wysyłki. Reszta jest automatyczna.
+
+## Pętla outreachu (lead → realna oferta → przychód)
+
+Leady z wynikiem ≥ `outreach.threshold` (domyślnie 75) trafiają do kolejki. Ty
+decydujesz, co wychodzi — albo włączasz pełne auto.
+
+```bash
+node agent/cli.ts outbox            # co czeka na wysłanie (z wynikiem)
+node agent/cli.ts approve <leadId>  # zatwierdź jeden
+node agent/cli.ts approve all       # zatwierdź wszystkie czekające
+node agent/cli.ts reject <leadId>   # pomiń
+node agent/cli.ts send              # wyślij zaakceptowane (respektuje dzienny limit)
+node agent/cli.ts mark <leadId> WON # wynik sprzedażowy (zasili scoring w fazie 2)
+```
+
+**Kanały wysyłki** (`tenant.channel`):
+- `file` (domyślnie, **bezpieczne**) — gotowa wiadomość ląduje w `data/outbox/<tenant>_<lead>.txt`; wklejasz ją na platformie/w mailu. Zero ryzyka spamu.
+- `webhook` → `RADAR_WEBHOOK_URL` (np. do Twojej automatyzacji).
+- `slack` → `SLACK_WEBHOOK_URL`.
+- `email` → `RESEND_API_KEY` (+ `RESEND_FROM`).
+
+**Pełna autonomia wysyłki:** ustaw `settings.outreach.autoApprove: true` i kanał
+inny niż `file` — wtedy cron sam zatwierdza i wysyła (z limitem `dailyCapPerTenant`).
+Każda wiadomość ma stopkę zgodności i opcję STOP. Wysyłka jest **idempotentna** —
+ten sam lead nigdy nie wyjdzie dwa razy.
 
 ## 3 sposoby uruchomienia
 
