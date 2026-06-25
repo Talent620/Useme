@@ -21,8 +21,11 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **GitHub Actions cron (autonomia w chmurze)** | ✅ **`.github/workflows/radar-autonomous.yml`** |
 | **Outreach z bramką + self-improving scoring** | ✅ **27 testów** |
 | **Serwer MCP (agent-native, 10 narzędzi)** | ✅ **`agent/mcp/`, 7 testów** |
+| **Realne źródła: robots/rate-limit/warunkowy GET** | ✅ **7 testów** |
+| **Persystencja Postgres/Prisma (swappowalny repo)** | ✅ **3 testy + migracja** ([PERSISTENCE.md](./PERSISTENCE.md)) |
+| **Billing Stripe + plany (limity w runtime)** | ✅ **9 testów** ([BILLING.md](./BILLING.md)) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
-| Live crawl (realne feedy) + billing | 🚧 włącz źródła + sekrety |
+| Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 
 > **Tryb autonomiczny:** [`AUTONOMY.md`](./AUTONOMY.md) — agent działa za Ciebie bez Twojego komputera.
 

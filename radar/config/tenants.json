@@ -27,6 +27,7 @@
       "name": "RadarPL (self-targeting)",
       "email": "founder@radar.pl",
       "channel": "file",
+      "plan": "AGENCY",
       "sender": {
         "name": "Zespół RadarPL",
         "role": "dostawca leadów dla freelancerów",
@@ -48,6 +49,7 @@
       "name": "Jan Kowalski — WordPress dev",
       "email": "jan@example.com",
       "channel": "file",
+      "plan": "PRO",
       "sender": {
         "name": "Jan Kowalski",
         "role": "freelancer WordPress",
@@ -70,6 +72,7 @@
       "name": "Anna Nowak — SEO/SEM",
       "email": "anna@example.com",
       "channel": "file",
+      "plan": "STARTER",
       "sender": {
         "name": "Anna Nowak",
         "role": "specjalistka SEO",

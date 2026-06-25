@@ -4,6 +4,7 @@
 
 import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_LEARN, DEFAULT_OUTREACH, type AgentConfig } from "./config.ts";
+import { effectiveDailyCap } from "./billing.ts";
 import { sendOutreach } from "./outreach.ts";
 import type { Store } from "./store.ts";
 
@@ -65,9 +66,11 @@ export async function runSend(store: Store, cfg: AgentConfig, nowMs = Date.now()
   for (const [tenantId, leads] of byTenant) {
     const tenant = cfg.tenants.find((t) => t.id === tenantId);
     if (!tenant) continue;
+    // Plan is the ceiling on daily sends, even if config asks for more.
+    const dailyCap = effectiveDailyCap(tenant.plan, out.dailyCapPerTenant);
     let used = store.sentCountSince(tenantId, since);
     for (const l of leads) {
-      if (used >= out.dailyCapPerTenant) {
+      if (used >= dailyCap) {
         capped++;
         continue;
       }

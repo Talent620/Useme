@@ -11,6 +11,7 @@ import {
   type Signal,
 } from "../packages/core/src/index.ts";
 import { DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
+import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -105,9 +106,11 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         draftBody: draft.body,
       });
       leadsCreated++;
-      // High-confidence leads enter the outreach pipeline (queued or auto-approved).
+      // High-confidence leads enter the outreach pipeline. Auto-approve only if
+      // the tenant's plan allows it (PRO+).
       if (outreach.enabled && stored.score >= outreach.threshold) {
-        if (store.queueOutreach(stored.id, outreach.autoApprove)) queuedForOutreach++;
+        const auto = effectiveAutoApprove(tenant.plan, outreach.autoApprove);
+        if (store.queueOutreach(stored.id, auto)) queuedForOutreach++;
       }
     }
   }
@@ -115,7 +118,8 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   // 4) Deliver undelivered leads per tenant (idempotent).
   const digests: CycleMetrics["digests"] = [];
   for (const t of cfg.tenants) {
-    const pending = store.undeliveredLeads(t.id).slice(0, cfg.settings.maxLeadsPerDigest);
+    const cap = effectiveDigestCap(t.plan, cfg.settings.maxLeadsPerDigest);
+    const pending = store.undeliveredLeads(t.id).slice(0, cap);
     if (!pending.length) continue;
     const res = await deliver(t, pending, startedAt);
     store.markDelivered(t.id, pending.map((l) => l.id), res.channel, startedAt);

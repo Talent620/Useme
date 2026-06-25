@@ -6,6 +6,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ICP, SourceKind } from "../packages/core/src/index.ts";
 import type { SenderProfile } from "../packages/core/src/proposal/template.ts";
+import type { Plan } from "./billing.ts";
 
 export interface SourceDef {
   name: string;
@@ -19,6 +20,8 @@ export interface TenantDef {
   name: string;
   email: string;
   channel: "file" | "email" | "slack" | "webhook";
+  /** Billing plan — governs digest size, auto-approve and outreach caps. */
+  plan?: Plan;
   sender: SenderProfile;
   icp: Omit<ICP, "id" | "tenantId">;
 }
