@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wrapper: pozwala uruchamiać narzędzie jako ./useme zamiast python3 -m useme_tool
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -m useme_tool "$@"

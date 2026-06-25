@@ -1,0 +1,13 @@
+# Dane runtime narzędzia (lokalna baza zadań / token)
+.useme/
+*.local
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
