@@ -8,7 +8,8 @@
 //   node agent/cli.ts draft <leadId>   # print the ready-to-send draft
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
-import { DEFAULT_OUTREACH, loadConfig } from "./config.ts";
+import { trainModel } from "../packages/core/src/index.ts";
+import { DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig } from "./config.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
 import { sendOutreach } from "./outreach.ts";
@@ -47,6 +48,16 @@ async function main() {
       console.log(`  Wysłanych ofert:      ${col(String(s.sends), C.b)}`);
       console.log(`  Wg statusu:           ${Object.entries(s.byStatus).map(([k, v]) => `${k}:${v}`).join(", ") || "—"}`);
       console.log(`  Outreach:             ${Object.entries(s.byOutreach).filter(([k]) => k !== "none").map(([k, v]) => `${k}:${v}`).join(", ") || "—"}`);
+      const cfgS = loadConfig();
+      const learned = cfgS.tenants
+        .map((t) => ({ id: t.id, m: store.getLearned(t.id) }))
+        .filter((x) => x.m);
+      if (learned.length) {
+        console.log(col("\n  Modele self-improving:", C.b));
+        for (const { id, m } of learned) {
+          console.log(`    ${id}: ${Object.keys(m!.keywordWeights).length} wag, ${m!.trainedOn} przykładów ${col(m!.updatedAt?.slice(0, 16).replace("T", " ") ?? "", C.dim)}`);
+        }
+      }
       console.log(col("\n  Zdrowie źródeł:", C.b));
       for (const [name, st] of Object.entries(s.sources)) {
         const mark = st.healthy ? col("●", C.g) : col("●", C.r);
@@ -81,6 +92,27 @@ async function main() {
       const [leadId, status] = args;
       const ok = store.setLeadStatus(leadId, status as never);
       console.log(ok ? col(`✓ ${leadId} -> ${status}`, C.g) : col(`Brak leada ${leadId}`, C.r));
+      break;
+    }
+    case "train": {
+      const cfg = loadConfig();
+      const learn = cfg.settings.learn ?? DEFAULT_LEARN;
+      console.log(col("\n  Trening modeli z wyników (WON/REPLIED vs REJECTED):\n", C.b));
+      for (const t of cfg.tenants) {
+        const ex = store.trainingExamples(t.id);
+        if (ex.length < learn.minExamples) {
+          console.log(`    ${t.id}: ${col(`za mało danych (${ex.length}/${learn.minExamples})`, C.dim)}`);
+          continue;
+        }
+        const model = trainModel(ex, Date.now());
+        store.setLearned(t.id, model);
+        const top = Object.entries(model.keywordWeights).sort((a, b) => b[1] - a[1]);
+        const pos = top.filter(([, w]) => w > 0).slice(0, 3).map(([k, w]) => `${k}+${w}`);
+        const neg = top.filter(([, w]) => w < 0).slice(-3).map(([k, w]) => `${k}${w}`);
+        console.log(`    ${col(t.id, C.b)}: ${ex.length} przykładów  ${col(pos.join(" ") || "—", C.g)}  ${col(neg.join(" ") || "", C.r)}`);
+      }
+      store.save();
+      console.log();
       break;
     }
     case "outbox": {
@@ -155,7 +187,8 @@ async function main() {
   approve <id>|all     zaakceptuj lead(y) do wysłania
   reject <id>          pomiń lead w outreachu
   send                 wyślij zaakceptowane (limit dzienny z configu)
-  mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)`);
+  mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
+  train                naucz modele scoringu z wyników (WON/LOST)`);
   }
 }
 

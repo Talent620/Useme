@@ -4,7 +4,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Lead, Signal } from "../packages/core/src/index.ts";
+import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/core/src/index.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -29,10 +29,11 @@ interface Db {
   leads: StoredLead[];
   deliveries: { id: string; tenantId: string; leadIds: string[]; channel: string; at: string }[];
   sends: { tenantId: string; leadId: string; via: string; at: string }[];
+  learned: Record<string, LearnedModel>;
   sourceState: Record<string, { lastRunAt?: string; lastError?: string; healthy: boolean }>;
 }
 
-const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], sourceState: {} };
+const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], learned: {}, sourceState: {} };
 
 export class Store {
   private db: Db;
@@ -163,6 +164,27 @@ export class Store {
   /** Count sends for a tenant since an ISO timestamp (daily-cap enforcement). */
   sentCountSince(tenantId: string, sinceISO: string): number {
     return this.db.sends.filter((s) => s.tenantId === tenantId && s.at >= sinceISO).length;
+  }
+
+  // -- self-improving scoring --------------------------------------------
+
+  /** Labeled examples from outcomes: WON/REPLIED = pos, REJECTED = neg. */
+  trainingExamples(tenantId: string): LabeledExample[] {
+    const out: LabeledExample[] = [];
+    for (const l of this.db.leads) {
+      if (l.tenantId !== tenantId) continue;
+      if (l.status === "WON" || l.status === "REPLIED") out.push({ keywords: l.matchedKeywords, label: "pos" });
+      else if (l.status === "REJECTED") out.push({ keywords: l.matchedKeywords, label: "neg" });
+    }
+    return out;
+  }
+
+  getLearned(tenantId: string): LearnedModel | undefined {
+    return this.db.learned[tenantId];
+  }
+
+  setLearned(tenantId: string, model: LearnedModel) {
+    this.db.learned[tenantId] = model;
   }
 
   setSourceState(name: string, state: { lastRunAt?: string; lastError?: string; healthy: boolean }) {

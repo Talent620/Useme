@@ -29,6 +29,18 @@ export interface Signal {
   dedupeKey: string;
 }
 
+/**
+ * Learned overlay produced from real WON/LOST feedback. Adjusts scores per
+ * keyword without touching the deterministic base. Empty/absent = no effect.
+ */
+export interface LearnedModel {
+  /** Normalized keyword -> log-odds weight (positive = correlates with WON). */
+  keywordWeights: Record<string, number>;
+  /** How many labeled examples this model was trained on. */
+  trainedOn: number;
+  updatedAt?: string;
+}
+
 /** Ideal Customer Profile for a tenant (the freelancer/agency we serve). */
 export interface ICP {
   id: string;
@@ -44,6 +56,8 @@ export interface ICP {
   maxBudget?: number;
   /** Per-source trust multiplier override (0..1). */
   sourceWeights?: Partial<Record<SourceKind, number>>;
+  /** Self-improving overlay learned from outcomes (optional). */
+  learned?: LearnedModel;
 }
 
 /** A scored, ICP-matched lead ready to be acted on. */

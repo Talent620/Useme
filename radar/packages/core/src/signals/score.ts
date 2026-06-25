@@ -9,6 +9,7 @@ import {
   type Signal,
 } from "./types.ts";
 import { normalizeForHash } from "./dedup.ts";
+import { learnedBoost } from "../learn.ts";
 
 export interface ScoreResult {
   score: number; // 0..100
@@ -95,9 +96,20 @@ export function scoreSignal(signal: Signal, icp: ICP, now: number): ScoreResult 
   raw += catPts;
   if (catOverlap.length) reasons.push(`categories: ${catOverlap.join(", ")}`);
 
+  const matchedKeywords = [...new Set([...kwHits, ...intentHits])];
+
+  // Self-improving overlay: nudge based on learned WON/LOST correlations.
+  if (icp.learned) {
+    const boost = learnedBoost(matchedKeywords, icp.learned);
+    if (boost) {
+      raw += boost;
+      reasons.push(`learned ${boost > 0 ? "+" : ""}${boost.toFixed(1)}`);
+    }
+  }
+
   const recency = recencyFactor(signal.publishedAt, now);
-  const score = Math.round(Math.min(100, raw) * recency);
+  const score = Math.round(Math.max(0, Math.min(100, raw)) * recency);
   reasons.push(`recency x${recency.toFixed(2)}`);
 
-  return { score, reasons, matchedKeywords: [...new Set([...kwHits, ...intentHits])] };
+  return { score, reasons, matchedKeywords };
 }

@@ -8,6 +8,10 @@
       "threshold": 75,
       "autoApprove": false,
       "dailyCapPerTenant": 20
+    },
+    "learn": {
+      "autoTrain": true,
+      "minExamples": 5
     }
   },
   "sources": [

@@ -7,9 +7,10 @@ import {
   dedupe,
   matchSignal,
   toSignal,
+  trainModel,
   type Signal,
 } from "../packages/core/src/index.ts";
-import { DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
+import { DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -63,7 +64,14 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   // 2) Dedupe within batch, then drop anything already seen in prior runs.
   const fresh = dedupe(collected).filter((s) => !store.hasSeen(s.dedupeKey));
   let leadsCreated = 0;
-  const icps = cfg.tenants.map((t) => ({ tenant: t, icp: tenantICP(t) }));
+  // Attach each tenant's learned overlay so scoring reflects past outcomes.
+  const learn = cfg.settings.learn ?? DEFAULT_LEARN;
+  const icps = cfg.tenants.map((t) => {
+    const icp = tenantICP(t);
+    const model = store.getLearned(t.id);
+    if (model && model.trainedOn >= learn.minExamples) icp.learned = model;
+    return { tenant: t, icp };
+  });
 
   // 3) Persist signals + score against every tenant ICP -> leads + drafts.
   for (const sig of fresh) {
@@ -97,6 +105,16 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
     const res = await deliver(t, pending, startedAt);
     store.markDelivered(t.id, pending.map((l) => l.id), res.channel, startedAt);
     digests.push({ tenant: t.id, leads: pending.length, ref: res.ref });
+  }
+
+  // 5) Auto-train per-tenant models from accumulated outcomes (cheap, optional).
+  if (learn.autoTrain) {
+    for (const t of cfg.tenants) {
+      const examples = store.trainingExamples(t.id);
+      if (examples.length >= learn.minExamples) {
+        store.setLearned(t.id, trainModel(examples, now));
+      }
+    }
   }
 
   store.save();

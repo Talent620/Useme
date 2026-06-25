@@ -34,12 +34,20 @@ export interface OutreachSettings {
   dailyCapPerTenant: number;
 }
 
+export interface LearnSettings {
+  /** Re-train the per-tenant model at the end of every cycle. */
+  autoTrain: boolean;
+  /** Minimum labeled examples before a model is trained/applied. */
+  minExamples: number;
+}
+
 export interface AgentConfig {
   settings: {
     intervalMinutes: number;
     threshold: number;
     maxLeadsPerDigest: number;
     outreach?: OutreachSettings;
+    learn?: LearnSettings;
   };
   sources: SourceDef[];
   tenants: TenantDef[];
@@ -51,6 +59,8 @@ export const DEFAULT_OUTREACH: OutreachSettings = {
   autoApprove: false,
   dailyCapPerTenant: 20,
 };
+
+export const DEFAULT_LEARN: LearnSettings = { autoTrain: true, minExamples: 5 };
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

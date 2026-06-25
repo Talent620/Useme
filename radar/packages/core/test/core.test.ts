@@ -6,6 +6,7 @@ import { recencyFactor, scoreSignal } from "../src/signals/score.ts";
 import { matchSignal } from "../src/icp/match.ts";
 import { buildProposal } from "../src/proposal/template.ts";
 import { extractBudget, toSignal } from "../src/sources/parse.ts";
+import { learnedBoost, trainModel } from "../src/learn.ts";
 import type { ICP, Signal } from "../src/signals/types.ts";
 
 const NOW = Date.parse("2026-06-25T12:00:00Z");
@@ -126,6 +127,41 @@ test("toSignal normalizes a raw listing end-to-end", () => {
   assert.equal(sig.budget, 3000);
   assert.deepEqual(sig.categories.sort(), ["ecommerce", "seo"]);
   assert.ok(sig.dedupeKey.length > 0);
+});
+
+test("trainModel learns positive/negative keyword weights", () => {
+  const model = trainModel([
+    { keywords: ["wordpress", "pilne"], label: "pos" },
+    { keywords: ["wordpress", "budzet"], label: "pos" },
+    { keywords: ["wolontariat"], label: "neg" },
+    { keywords: ["wolontariat", "za darmo"], label: "neg" },
+  ]);
+  assert.ok(model.keywordWeights["wordpress"] > 0, "WON keyword positive");
+  assert.ok(model.keywordWeights["wolontariat"] < 0, "REJECTED keyword negative");
+  assert.equal(model.trainedOn, 4);
+});
+
+test("learnedBoost nudges scores within bounds and respects sign", () => {
+  const model = trainModel([
+    { keywords: ["wordpress"], label: "pos" },
+    { keywords: ["wordpress"], label: "pos" },
+    { keywords: ["spam"], label: "neg" },
+    { keywords: ["spam"], label: "neg" },
+  ]);
+  assert.ok(learnedBoost(["wordpress"], model) > 0);
+  assert.ok(learnedBoost(["spam"], model) < 0);
+  assert.equal(learnedBoost(["wordpress"], undefined), 0);
+  assert.ok(Math.abs(learnedBoost(["wordpress", "spam"], model)) <= 15);
+});
+
+test("scoreSignal applies a learned overlay on top of the base", () => {
+  const base = scoreSignal(mkSignal(), WP_ICP, NOW).score;
+  const learnedICP: ICP = {
+    ...WP_ICP,
+    learned: { keywordWeights: { wordpress: 2 }, trainedOn: 10 },
+  };
+  const boosted = scoreSignal(mkSignal(), learnedICP, NOW).score;
+  assert.ok(boosted >= base, `learned overlay should not lower a positive match (${boosted} vs ${base})`);
 });
 
 test("buildProposal produces a non-empty grounded draft", () => {

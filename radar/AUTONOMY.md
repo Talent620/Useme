@@ -51,6 +51,27 @@ inny niż `file` — wtedy cron sam zatwierdza i wysyła (z limitem `dailyCapPer
 Każda wiadomość ma stopkę zgodności i opcję STOP. Wysyłka jest **idempotentna** —
 ten sam lead nigdy nie wyjdzie dwa razy.
 
+## Self-improving scoring (system uczy się sam)
+
+Twoje decyzje `mark <leadId> WON|REPLIED|REJECTED` to dane treningowe. Agent uczy
+per-tenant modelu wag słów kluczowych (log-odds, deterministycznie — bez ML) i
+**sprzęga go zwrotnie ze scoringiem**: leady podobne do tych, które historycznie
+wygrałeś, dostają wyżej; podobne do odrzuconych — niżej.
+
+```bash
+node agent/cli.ts mark lead_3 WON       # zamknięte zlecenie
+node agent/cli.ts mark lead_7 REJECTED  # nietrafione
+node agent/cli.ts train                 # przelicz modele (lub autoTrain co cykl)
+```
+
+- `settings.learn.autoTrain: true` — model przeliczany na końcu każdego cyklu.
+- `settings.learn.minExamples` — ile etykiet zanim model zacznie działać (domyślnie 5).
+- Boost jest ograniczony do ±15 pkt, więc uczenie **dostraja ranking**, nie nadpisuje
+  deterministycznej bazy. Model jest wytłumaczalny (widać wagi w `status`).
+
+Przykład efektu: nowy sygnał WordPress dla tenanta, który wygrywał zlecenia WP —
+score **74 → 89** po nauczeniu. To jest moat danych: im dłużej działa, tym celniej trafia.
+
 ## 3 sposoby uruchomienia
 
 ### 1) Chmura, za darmo — GitHub Actions (zalecane)
