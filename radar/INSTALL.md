@@ -19,6 +19,15 @@ Najnowsze wydanie: **[GitHub Releases](https://github.com/talent620/useme/releas
 
 > Sumy kontrolne: `SHA256SUMS.txt` w tym samym wydaniu (`sha256sum -c SHA256SUMS.txt`).
 
+### Przejrzysty panel webowy (zalecane)
+Binarka ma wbudowany panel operatora — czysty interfejs z live-odświeżaniem,
+przyciskiem **„RÓB ZA MNIE"** i akcjami (wykonaj/zatwierdź/wyślij/aktualizuj):
+```bash
+./radar-linux serve            # → http://localhost:7777
+```
+Otwórz w przeglądarce. Z telefonu: uruchom z `--host 0.0.0.0` i wejdź na IP serwera
+(albo zainstaluj APK i wskaż ten adres).
+
 ### Pierwsze uruchomienie
 Przy pierwszym starcie binarka tworzy edytowalny `config/tenants.json` obok siebie
 (profil + ICP + źródła). Uzupełnij go i gotowe.

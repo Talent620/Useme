@@ -13,6 +13,7 @@ import { runExecute, runExecuteLead, runForecast, runQualityTrain, runReport, ru
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
+import { serve } from "./serve.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
 import { Store } from "./store.ts";
@@ -192,6 +193,11 @@ async function main() {
       console.log();
       break;
     }
+    case "serve": {
+      const f = parseFlags(args);
+      serve(f.port ? Number(f.port) : undefined, f.host);
+      return; // keep process alive
+    }
     case "auto": {
       // One button: run a full autonomous cycle, then surface the operator report.
       const cfg = loadConfig();
@@ -328,6 +334,7 @@ async function main() {
   reject <id>          pomiń lead w outreachu
   send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
+  serve [--port 7777]  panel webowy (przejrzysty UI, live, przyciski akcji)
   auto                 JEDEN PRZYCISK: pełny cykl + wykonanie + panel
   execute              autonomicznie zrealizuj wygrane zlecenia (deliverable)
   work <leadId>        wykonaj konkretne zlecenie teraz (na żądanie)
