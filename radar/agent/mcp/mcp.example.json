@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "radar": {
+      "command": "node",
+      "args": ["./radar/agent/mcp/server.ts"],
+      "env": {
+        "RADAR_DATA_DIR": "./radar/data",
+        "RADAR_CONFIG": "./radar/config/tenants.json",
+        "OPENAI_API_KEY": ""
+      }
+    }
+  }
+}

@@ -8,11 +8,10 @@
 //   node agent/cli.ts draft <leadId>   # print the ready-to-send draft
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
-import { trainModel } from "../packages/core/src/index.ts";
-import { DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig } from "./config.ts";
+import { DEFAULT_LEARN, loadConfig } from "./config.ts";
+import { runSend, runTrain } from "./actions.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
-import { sendOutreach } from "./outreach.ts";
 import { Store } from "./store.ts";
 
 const C = { dim: "\x1b[2m", b: "\x1b[1m", g: "\x1b[32m", y: "\x1b[33m", r: "\x1b[31m", x: "\x1b[0m" };
@@ -98,20 +97,15 @@ async function main() {
       const cfg = loadConfig();
       const learn = cfg.settings.learn ?? DEFAULT_LEARN;
       console.log(col("\n  Trening modeli z wyników (WON/REPLIED vs REJECTED):\n", C.b));
-      for (const t of cfg.tenants) {
-        const ex = store.trainingExamples(t.id);
-        if (ex.length < learn.minExamples) {
-          console.log(`    ${t.id}: ${col(`za mało danych (${ex.length}/${learn.minExamples})`, C.dim)}`);
+      for (const r of runTrain(store, cfg)) {
+        if (!r.trained) {
+          console.log(`    ${r.tenantId}: ${col(`za mało danych (${r.examples}/${learn.minExamples})`, C.dim)}`);
           continue;
         }
-        const model = trainModel(ex, Date.now());
-        store.setLearned(t.id, model);
-        const top = Object.entries(model.keywordWeights).sort((a, b) => b[1] - a[1]);
-        const pos = top.filter(([, w]) => w > 0).slice(0, 3).map(([k, w]) => `${k}+${w}`);
-        const neg = top.filter(([, w]) => w < 0).slice(-3).map(([k, w]) => `${k}${w}`);
-        console.log(`    ${col(t.id, C.b)}: ${ex.length} przykładów  ${col(pos.join(" ") || "—", C.g)}  ${col(neg.join(" ") || "", C.r)}`);
+        const pos = r.top.filter((x) => x.weight > 0).slice(0, 3).map((x) => `${x.keyword}+${x.weight}`);
+        const neg = r.top.filter((x) => x.weight < 0).slice(0, 3).map((x) => `${x.keyword}${x.weight}`);
+        console.log(`    ${col(r.tenantId, C.b)}: ${r.examples} przykładów  ${col(pos.join(" ") || "—", C.g)}  ${col(neg.join(" ") || "", C.r)}`);
       }
-      store.save();
       console.log();
       break;
     }
@@ -148,32 +142,13 @@ async function main() {
     }
     case "send": {
       const cfg = loadConfig();
-      const out = cfg.settings.outreach ?? DEFAULT_OUTREACH;
-      const approved = store.outbox("approved");
-      if (!approved.length) { console.log(col("  Brak zaakceptowanych leadów do wysłania.", C.dim)); break; }
-      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const byTenant = new Map<string, typeof approved>();
-      for (const l of approved) {
-        const arr = byTenant.get(l.tenantId) ?? [];
-        arr.push(l);
-        byTenant.set(l.tenantId, arr);
+      const summary = await runSend(store, cfg);
+      if (!summary.items.length && !summary.capped) {
+        console.log(col("  Brak zaakceptowanych leadów do wysłania.", C.dim));
+        break;
       }
-      let sent = 0, capped = 0;
-      for (const [tenantId, leads] of byTenant) {
-        const tenant = cfg.tenants.find((t) => t.id === tenantId);
-        if (!tenant) continue;
-        let used = store.sentCountSince(tenantId, since);
-        for (const l of leads) {
-          if (used >= out.dailyCapPerTenant) { capped++; continue; }
-          const now = new Date().toISOString();
-          const res = await sendOutreach(tenant, l, now);
-          store.recordSend(tenantId, l.id, res.via, now);
-          used++; sent++;
-          console.log(`  ${col("→", C.g)} ${l.id} via ${res.via}  ${col(res.ref, C.dim)}`);
-        }
-      }
-      store.save();
-      console.log(col(`\n✓ Wysłano ${sent}${capped ? `, wstrzymano ${capped} (dzienny limit)` : ""}`, C.g));
+      for (const it of summary.items) console.log(`  ${col("→", C.g)} ${it.leadId} via ${it.via}  ${col(it.ref, C.dim)}`);
+      console.log(col(`\n✓ Wysłano ${summary.sent}${summary.capped ? `, wstrzymano ${summary.capped} (dzienny limit)` : ""}`, C.g));
       break;
     }
     default:

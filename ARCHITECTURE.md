@@ -119,15 +119,19 @@ Indeksy pod gorące zapytania: `Lead(tenantId, status, score)`, `Signal(source, 
 Zasada: **decyzje (scoring) deterministyczne i tanie**, LLM tylko do normalizacji
 i języka. Dzięki temu koszt i jakość są przewidywalne.
 
-## 6. MCP
+## 6. MCP ✅ (działa)
 
-RadarPL wystawia **serwer MCP** (`radar-mcp`), żeby leady były dostępne dla
-agentów klienta (Claude/Cursor/n8n) jako narzędzia:
-- `radar.list_leads(tenantId, min)` — pobierz leady wg intencji,
-- `radar.draft_outreach(leadId)` — wygeneruj/odśwież draft,
-- `radar.mark(leadId, status)` — sprzężenie zwrotne do self-improve.
+RadarPL wystawia **serwer MCP** (`radar-mcp`, stdio/JSON-RPC 2.0, zero zależności)
+— leady i sterowanie pipeline'em dostępne dla agentów klienta (Claude/Cursor/n8n)
+jako narzędzia. 10 narzędzi, m.in.:
+- `radar_list_leads(tenantId, min)` — leady wg intencji,
+- `radar_get_draft(leadId)` — gotowy draft,
+- `radar_approve` / `radar_send` — bramka i wysyłka outreachu,
+- `radar_mark(leadId, status)` — sprzężenie zwrotne do self-improve,
+- `radar_run_cycle` / `radar_train` — pełny cykl i trening.
 
-To czyni produkt „agent-native": klient podpina RadarPL do własnego workflowu AI.
+Implementacja i rejestracja: `radar/agent/mcp/` (+ `mcp.example.json`). To czyni
+produkt „agent-native": klient podpina RadarPL do własnego workflowu AI.
 
 ## 7. API (Next.js, App Router)
 

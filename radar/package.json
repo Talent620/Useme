@@ -20,7 +20,9 @@
     "agent:once": "node agent/cli.ts once",
     "agent:loop": "node agent/cli.ts loop",
     "agent:status": "node agent/cli.ts status",
-    "agent:leads": "node agent/cli.ts leads"
+    "agent:leads": "node agent/cli.ts leads",
+    "test:mcp": "node --test agent/mcp/test/mcp.test.ts",
+    "mcp": "node agent/mcp/server.ts"
   },
   "devDependencies": {
     "prisma": "^5.20.0",
