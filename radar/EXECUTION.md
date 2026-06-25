@@ -26,6 +26,12 @@ Packager → deliverable + confidence + bramka (auto / review)
 - **Wykonawcy** (`exec/capabilities.ts`) — `writer`, `landing` (HTML), `audit`,
   `spec`, `translate`. Deterministyczny baseline działa offline; z `OPENAI_API_KEY`
   warstwa LLM podnosi jakość do pełnej prozy/kodu.
+- **Narzędzia** (`exec/tools/`) — wykonawcy używają realnych narzędzi, nie tylko
+  szablonów. `tools/web.ts` pobiera stronę (http + `file:`), `tools/seo.ts`
+  **analizuje realne sygnały on-page** (title, meta, H1, ALT, treść, viewport,
+  canonical, schema, HTTPS) i generuje audyt z priorytetami na podstawie faktycznej
+  strony. Gdy brief zawiera URL → audyt realny; inaczej fallback. Deliverables
+  zapisywane też w natywnym formacie (otwieralny `.html`).
 - **Krytyk** (`exec/critic.ts`) — deterministyczna, audytowalna ocena; jego uwagi
   napędzają rewizję (samopoprawę).
 - **Silnik** (`exec/engine.ts`) — pętla plan→produkcja→weryfikacja→rewizja do

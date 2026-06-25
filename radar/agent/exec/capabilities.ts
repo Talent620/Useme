@@ -3,6 +3,8 @@
 // upgrade. `depth` grows on revision so the engine can climb to passing quality.
 
 import { complete } from "../llm.ts";
+import { fetchHtml, firstUrl } from "./tools/web.ts";
+import { analyzeHtml, auditFindings, renderAuditReport } from "./tools/seo.ts";
 import type { Artifact, Capability, Job, TaskSpec } from "./types.ts";
 
 export interface ExecCtx {
@@ -88,6 +90,20 @@ ${feat}
 
 async function audit(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact> {
   const kw = keywords(task).length ? keywords(task) : job.categories;
+
+  // Tool-using path: if the brief references a site, analyze it for real.
+  const url = firstUrl(job.brief);
+  if (url) {
+    try {
+      const html = await fetchHtml(url);
+      const signals = analyzeHtml(html, url.startsWith("file:") ? undefined : url);
+      const report = renderAuditReport(job.title, signals, auditFindings(signals));
+      return { taskId: task.id, format: "md", content: report, meta: { engine: "tool:seo", url } };
+    } catch {
+      /* unreachable site -> fall through to LLM/template */
+    }
+  }
+
   const llm = await maybeLLM(
     "Jesteś audytorem SEO/technicznym. Zwróć raport po polsku z priorytetami (Wysoki/Średni/Niski).",
     `Wykonaj audyt dla zlecenia: ${job.title}. Brief: ${job.brief}. Obszary: ${kw.join(", ")}.`,

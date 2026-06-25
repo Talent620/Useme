@@ -13,7 +13,7 @@
     "test": "pnpm -r --if-present test",
     "test:core": "pnpm --filter @radar/core test",
     "test:agent": "node --test agent/test/cycle.test.ts agent/test/outreach.test.ts agent/test/learn.test.ts agent/test/crawl.test.ts agent/test/repo.test.ts agent/test/billing.test.ts agent/test/onboarding.test.ts agent/test/execute.test.ts",
-    "test:exec": "node --test agent/exec/test/engine.test.ts",
+    "test:exec": "node --test agent/exec/test/engine.test.ts agent/exec/test/tools.test.ts",
     "agent:execute": "node agent/cli.ts execute",
     "typecheck": "pnpm -r --if-present typecheck",
     "dev": "docker compose up -d && pnpm --filter @radar/web dev",

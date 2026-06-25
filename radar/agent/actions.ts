@@ -84,6 +84,12 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
     const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence });
     const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
     writeFileSync(ref, report.deliverable);
+    // Also write each artifact in its native format (openable .html, .txt).
+    for (const o of report.outcomes) {
+      if (o.artifact.format !== "md") {
+        writeFileSync(resolve(dir, `${lead.tenantId}_${lead.id}.${o.artifact.format}`), o.artifact.content);
+      }
+    }
     store.recordExecution(lead.id, report.gate, report.confidence, ref);
     items.push({ leadId: lead.id, capability: report.outcomes[0]?.task.capability ?? "?", confidence: report.confidence, gate: report.gate, ref });
     if (report.gate === "auto") auto++;
