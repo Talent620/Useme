@@ -2,7 +2,7 @@
 // plans it into tasks, executes each via a capability, self-verifies against
 // acceptance criteria, and packages a deliverable with a confidence score.
 
-export type Capability = "writer" | "landing" | "audit" | "spec" | "translate";
+export type Capability = "writer" | "landing" | "audit" | "spec" | "translate" | "scaffold";
 
 export interface Job {
   id: string;
@@ -18,7 +18,8 @@ export type CriterionType =
   | "hasSections"
   | "keywordCoverage"
   | "noPlaceholders"
-  | "htmlValid";
+  | "htmlValid"
+  | "jsonValid";
 
 export interface AcceptanceCriterion {
   id: string;
@@ -35,7 +36,7 @@ export interface TaskSpec {
   acceptance: AcceptanceCriterion[];
 }
 
-export type ArtifactFormat = "md" | "html" | "txt";
+export type ArtifactFormat = "md" | "html" | "txt" | "json";
 
 export interface Artifact {
   taskId: string;

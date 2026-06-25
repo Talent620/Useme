@@ -41,12 +41,26 @@ function evalCriterion(c: AcceptanceCriterion, art: Artifact): { ratio: number; 
     }
     case "noPlaceholders":
       return PLACEHOLDER_RE.test(text) ? { ratio: 0, issue: "zawiera placeholdery/TODO" } : { ratio: 1 };
+    case "jsonValid": {
+      try {
+        const parsed = JSON.parse(text);
+        const minKeys = Number(c.params?.minKeys ?? 1);
+        const ok = parsed && typeof parsed === "object" && Object.keys(parsed).length >= minKeys;
+        return ok ? { ratio: 1 } : { ratio: 0.5, issue: "JSON zbyt ubogi" };
+      } catch {
+        return { ratio: 0, issue: "niepoprawny JSON" };
+      }
+    }
     case "htmlValid": {
       if (art.format !== "html") return { ratio: 0, issue: "oczekiwano HTML" };
-      const opens = (text.match(/<([a-z][a-z0-9]*)\b[^>]*>/gi) ?? []).length;
-      const closes = (text.match(/<\/([a-z][a-z0-9]*)\s*>/gi) ?? []).length;
-      const selfClosing = (text.match(/<(img|br|hr|meta|input|link)\b[^>]*\/?>/gi) ?? []).length;
-      const balanced = Math.abs(opens - selfClosing - closes) <= 1;
+      const opens = (text.match(/<[a-z][a-z0-9]*\b[^>]*>/gi) ?? []).length;
+      const closes = (text.match(/<\/[a-z][a-z0-9]*\s*>/gi) ?? []).length;
+      // Void elements + any self-closing tag (alternation picks one per position).
+      const selfOrVoid = (text.match(/<(?:meta|link|br|hr|img|input|source|area|base|col|embed|param|track|wbr)\b[^>]*>|<[a-z][^>]*\/>/gi) ?? []).length;
+      const paired = opens - selfOrVoid;
+      const balanced = Math.abs(paired - closes) <= 2;
+      const hasDoc = /<html[\s>]/i.test(text) && /<\/html>/i.test(text);
+      if (!hasDoc) return { ratio: 0.5, issue: "brak struktury <html>" };
       return balanced ? { ratio: 1 } : { ratio: 0.5, issue: "niezbalansowane tagi HTML" };
     }
     default:

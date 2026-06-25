@@ -27,11 +27,20 @@ Packager → deliverable + confidence + bramka (auto / review)
   `spec`, `translate`. Deterministyczny baseline działa offline; z `OPENAI_API_KEY`
   warstwa LLM podnosi jakość do pełnej prozy/kodu.
 - **Narzędzia** (`exec/tools/`) — wykonawcy używają realnych narzędzi, nie tylko
-  szablonów. `tools/web.ts` pobiera stronę (http + `file:`), `tools/seo.ts`
-  **analizuje realne sygnały on-page** (title, meta, H1, ALT, treść, viewport,
-  canonical, schema, HTTPS) i generuje audyt z priorytetami na podstawie faktycznej
-  strony. Gdy brief zawiera URL → audyt realny; inaczej fallback. Deliverables
-  zapisywane też w natywnym formacie (otwieralny `.html`).
+  szablonów:
+  - `tools/web.ts` — pobiera stronę (http + `file:`), wykrywa URL-e w briefie.
+  - `tools/seo.ts` — **realna analiza on-page** (title, meta, H1, ALT, treść,
+    viewport, canonical, schema, HTTPS) → audyt z priorytetami na bazie faktycznej strony.
+  - `tools/research.ts` — **research z cytowaniami**: pobiera 2–4 źródła, ekstrahuje
+    czytelną treść, syntetyzuje artykuł z odnośnikami [n] + sekcją „Źródła".
+  - `tools/scaffold.ts` — **buduje działający artefakt**: importowalny workflow
+    n8n (poprawny JSON, węzły dobrane do kroków briefu).
+  - Deliverables zapisywane też w natywnym formacie (otwieralny `.html`, `.json`).
+- **Graf wielozadaniowy** — planner emituje kilka deliverabli, gdy zlecenie tego
+  wymaga: `automation → spec + workflow n8n`, `ecommerce → landing + treści`. Każde
+  zadanie ma własne kryteria; `confidence` = min ocen (łańcuch tak mocny jak najsłabsze ogniwo).
+- **Landing klasy produkcyjnej** — JSON-LD (schema.org), Open Graph, responsywny
+  CSS, SVG hero + manifest assetów (prompty do generatora obrazów, np. Higgsfield).
 - **Krytyk** (`exec/critic.ts`) — deterministyczna, audytowalna ocena; jego uwagi
   napędzają rewizję (samopoprawę).
 - **Silnik** (`exec/engine.ts`) — pętla plan→produkcja→weryfikacja→rewizja do

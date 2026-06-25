@@ -3,8 +3,10 @@
 // upgrade. `depth` grows on revision so the engine can climb to passing quality.
 
 import { complete } from "../llm.ts";
-import { fetchHtml, firstUrl } from "./tools/web.ts";
+import { allUrls, fetchHtml, firstUrl } from "./tools/web.ts";
 import { analyzeHtml, auditFindings, renderAuditReport } from "./tools/seo.ts";
+import { gatherSources, synthesizeWithCitations } from "./tools/research.ts";
+import { renderWorkflowJson } from "./tools/scaffold.ts";
 import type { Artifact, Capability, Job, TaskSpec } from "./types.ts";
 
 export interface ExecCtx {
@@ -48,6 +50,16 @@ async function writer(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact>
   const kw = keywords(task).length ? keywords(task) : job.categories;
   const perSection = 5 + ctx.depth * 2; // more depth => longer
 
+  // Tool-using path: ground the article in real sources with citations.
+  const urls = allUrls(job.brief);
+  if (urls.length) {
+    const sources = await gatherSources(urls);
+    if (sources.length) {
+      const content = synthesizeWithCitations(job.title, sources, kw, secs);
+      return { taskId: task.id, format: "md", content, meta: { engine: "tool:research", sources: sources.length } };
+    }
+  }
+
   const llm = await maybeLLM(
     "Jesteś ekspertem-copywriterem. Pisz po polsku, konkretnie, bez lania wody. Użyj nagłówków ## dla sekcji.",
     `Zadanie: ${job.title}\nBrief: ${job.brief}\nSekcje: ${secs.join(", ")}\nSłowa kluczowe (użyj naturalnie): ${kw.join(", ")}\nNapisz gotowy artykuł.`,
@@ -71,21 +83,50 @@ async function landing(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact
   );
   if (llm && /<html|<section|<main/i.test(llm)) return { taskId: task.id, format: "html", content: llm, meta: { engine: "llm" } };
 
+  const desc = job.brief.slice(0, 155).replace(/"/g, "'");
   const feat = features
-    .map((f) => `    <section class="feature"><h2>${f}</h2><p>${paragraphs(job.brief, [f], 1)}</p></section>`)
+    .map((f) => `      <section class="feature"><h2>${f}</h2><p>${paragraphs(job.brief, [f], 1)}</p></section>`)
     .join("\n");
+  const jsonld = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: job.title,
+    description: desc,
+    areaServed: "PL",
+  });
+  const svgHero = `<svg class="art" viewBox="0 0 600 200" role="img" aria-label="ilustracja"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="600" height="200" rx="16" fill="url(#g)"/></svg>`;
   const content = `<!doctype html>
 <html lang="${job.lang}">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${job.title}</title></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${job.title}</title>
+  <meta name="description" content="${desc}">
+  <meta property="og:title" content="${job.title}">
+  <meta property="og:description" content="${desc}">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="#">
+  <style>
+    :root{--brand:#4f46e5}*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;color:#0f172a;line-height:1.6}
+    .hero{padding:64px 24px;text-align:center;background:#f8fafc}.hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 12px}
+    .cta{display:inline-block;margin-top:16px;padding:12px 24px;background:var(--brand);color:#fff;border-radius:10px;text-decoration:none}
+    main{max-width:960px;margin:0 auto;padding:32px 24px;display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+    .feature{padding:20px;border:1px solid #e2e8f0;border-radius:14px}.art{width:100%;height:auto;max-width:600px;margin:24px auto;display:block}
+    footer{background:#0f172a;color:#e2e8f0;padding:48px 24px;text-align:center}
+  </style>
+  <script type="application/ld+json">${jsonld}</script>
+</head>
 <body>
-  <header class="hero"><h1>${job.title}</h1><p>${job.brief.slice(0, 160)}</p><a class="cta" href="#kontakt">Zamów wycenę</a></header>
+  <header class="hero"><h1>${job.title}</h1><p>${desc}</p>${svgHero}<a class="cta" href="#kontakt">Zamów wycenę</a></header>
   <main>
 ${feat}
   </main>
   <footer id="kontakt"><h2>Kontakt</h2><p>Napisz do nas, przygotujemy ofertę w 24h.</p></footer>
 </body>
 </html>`;
-  return { taskId: task.id, format: "html", content, meta: { engine: "template", depth: ctx.depth } };
+  // Asset manifest: prompts a downstream image generator (e.g. Higgsfield) can fulfill.
+  const assetManifest = features.map((f) => ({ slot: f, prompt: `nowoczesna ilustracja: ${f}, ${job.title}, czysty styl, gradient` }));
+  return { taskId: task.id, format: "html", content, meta: { engine: "template", depth: ctx.depth, assets: assetManifest } };
 }
 
 async function audit(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact> {
@@ -141,11 +182,24 @@ async function translate(task: TaskSpec, job: Job): Promise<Artifact> {
   };
 }
 
+async function scaffold(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact> {
+  // Derive workflow steps from the brief's clauses (fallback to a sane default).
+  const clauses = job.brief
+    .split(/[.,;:\n]| oraz | i /i)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 6)
+    .slice(0, 4 + ctx.depth);
+  const steps = clauses.length ? clauses : ["Pobierz dane (HTTP)", "Przekształć", "Zapisz wynik"];
+  const content = renderWorkflowJson(job.title, steps);
+  return { taskId: task.id, format: "json", content, meta: { engine: "tool:scaffold", steps: steps.length } };
+}
+
 const REGISTRY: Record<Capability, (t: TaskSpec, j: Job, c: ExecCtx) => Promise<Artifact>> = {
   writer,
   landing,
   audit,
   spec,
+  scaffold,
   translate: (t, j) => translate(t, j),
 };
 

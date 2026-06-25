@@ -10,8 +10,12 @@ const TIMEOUT_MS = Number(process.env.CRAWL_TIMEOUT_MS ?? "12000");
 
 /** Extract the first URL (http(s) or file:) mentioned in free text. */
 export function firstUrl(text: string): string | undefined {
-  const m = text.match(/\b(?:https?:\/\/|file:)[^\s)<>"']+/i);
-  return m?.[0];
+  return allUrls(text)[0];
+}
+
+/** Extract all URLs (http(s) or file:) mentioned in free text. */
+export function allUrls(text: string): string[] {
+  return text.match(/\b(?:https?:\/\/|file:)[^\s)<>"']+/gi) ?? [];
 }
 
 export async function fetchHtml(url: string): Promise<string> {

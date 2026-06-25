@@ -5,12 +5,15 @@ import type { AcceptanceCriterion, Capability, Job, TaskSpec } from "./types.ts"
 
 const STOP = new Set(["i", "w", "na", "do", "z", "ze", "że", "to", "się", "jest", "dla", "oraz", "lub", "the", "and", "for", "with", "potrzebuję", "szukam", "zlecę", "budżet"]);
 
+const URL_TOKENS = new Set(["file", "http", "https", "config", "html", "www", "com", "pl"]);
+
 function deriveKeywords(job: Job): string[] {
   const toks = job.brief
     .toLowerCase()
+    .replace(/\b(?:https?:\/\/|file:)[^\s)<>"']+/gi, " ") // drop URLs entirely
     .replace(/[^a-ząćęłńóśźż0-9\s]/gi, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 3 && !STOP.has(w));
+    .filter((w) => w.length > 3 && !STOP.has(w) && !URL_TOKENS.has(w));
   const freq = new Map<string, number>();
   for (const t of toks) freq.set(t, (freq.get(t) ?? 0) + 1);
   const salient = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([w]) => w);
@@ -55,6 +58,12 @@ function criteriaFor(cap: Capability, keywords: string[]): AcceptanceCriterion[]
         { id: "sec", type: "hasSections", params: { sections: ["Cel", "Zakres", "Architektura", "Kroki wdrożenia"] }, weight: 35 },
         kw, noph,
       ];
+    case "scaffold":
+      return [
+        { id: "json", type: "jsonValid", params: { minKeys: 3 }, weight: 55 },
+        { id: "sec", type: "hasSections", params: { sections: ["nodes", "connections"] }, weight: 30 },
+        noph,
+      ];
     case "translate":
       return [
         { id: "len", type: "minWords", params: { min: 30 }, weight: 50 },
@@ -68,18 +77,25 @@ const INSTRUCTION: Record<Capability, string> = {
   landing: "Zbuduj kompletny, semantyczny landing page (HTML).",
   audit: "Wykonaj audyt z priorytetyzowanymi rekomendacjami.",
   spec: "Przygotuj specyfikację techniczną gotową do wdrożenia.",
+  scaffold: "Zbuduj importowalny workflow automatyzacji (n8n JSON).",
   translate: "Przetłumacz treść wiernie, zachowując sens i ton.",
 };
 
+/** Decompose a job into a capability graph — several deliverables when the job
+ *  genuinely needs them (true multi-agent execution). */
+function capabilitiesFor(job: Job): Capability[] {
+  const c = new Set(job.categories);
+  if (c.has("automation")) return ["spec", "scaffold"]; // spec + importowalny workflow
+  if (c.has("ecommerce")) return ["landing", "writer"]; // strona + treści/opisy
+  return [pickCapability(job)];
+}
+
 export function planJob(job: Job): TaskSpec[] {
   const keywords = deriveKeywords(job);
-  const capability = pickCapability(job);
-  return [
-    {
-      id: `${job.id}-t1`,
-      capability,
-      instruction: INSTRUCTION[capability],
-      acceptance: criteriaFor(capability, keywords),
-    },
-  ];
+  return capabilitiesFor(job).map((capability, i) => ({
+    id: `${job.id}-t${i + 1}`,
+    capability,
+    instruction: INSTRUCTION[capability],
+    acceptance: criteriaFor(capability, keywords),
+  }));
 }
