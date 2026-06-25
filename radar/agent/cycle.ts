@@ -10,8 +10,9 @@ import {
   trainModel,
   type Signal,
 } from "../packages/core/src/index.ts";
-import { DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
+import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
+import { runExecute } from "./actions.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -24,6 +25,7 @@ export interface CycleMetrics {
   newSignals: number;
   leadsCreated: number;
   queuedForOutreach: number;
+  executed: number;
   digests: { tenant: string; leads: number; ref: string }[];
   durationMs: number;
 }
@@ -102,6 +104,9 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         signalTitle: sig.title,
         signalUrl: sig.url,
         signalBudget: sig.budget,
+        signalBody: sig.body,
+        signalCategories: sig.categories,
+        signalLang: sig.lang,
         draftSubject: draft.subject,
         draftBody: draft.body,
       });
@@ -136,10 +141,19 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
     }
   }
 
+  // 6) Autonomously execute won leads (plan→produce→verify→package).
+  let executed = 0;
+  const exec = cfg.settings.execution ?? DEFAULT_EXECUTION;
+  if (exec.enabled && exec.autoExecuteOnWon) {
+    const e = await runExecute(store, cfg);
+    executed = e.executed;
+  }
+
   store.save();
   return {
     startedAt,
     sources: sourcesMeta,
+    executed,
     uniqueFresh: fresh.length,
     newSignals: fresh.length,
     leadsCreated,

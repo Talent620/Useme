@@ -2,9 +2,12 @@
 // surfaces never diverge. Each function takes a Store + config, mutates state,
 // persists, and returns a plain result object (easy to render or serialize).
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { trainModel } from "../packages/core/src/index.ts";
-import { DEFAULT_LEARN, DEFAULT_OUTREACH, type AgentConfig } from "./config.ts";
+import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, ROOT, type AgentConfig } from "./config.ts";
 import { effectiveDailyCap } from "./billing.ts";
+import { executeJob, jobFromLead } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
 import type { Store } from "./store.ts";
 
@@ -46,6 +49,48 @@ export interface SendSummary {
   sent: number;
   capped: number;
   items: SendResultItem[];
+}
+
+export interface ExecItem {
+  leadId: string;
+  capability: string;
+  confidence: number;
+  gate: "auto" | "review";
+  ref: string;
+}
+export interface ExecSummary {
+  executed: number;
+  auto: number;
+  review: number;
+  items: ExecItem[];
+}
+
+/** Autonomously execute won leads: plan → produce → self-verify → package. */
+export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSummary> {
+  const exec = cfg.settings.execution ?? DEFAULT_EXECUTION;
+  const dir = resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "deliverables");
+  mkdirSync(dir, { recursive: true });
+
+  const items: ExecItem[] = [];
+  let auto = 0;
+  let reviewN = 0;
+  for (const lead of store.executableLeads()) {
+    const job = jobFromLead(
+      lead,
+      lead.signalBody ?? lead.signalTitle,
+      lead.signalCategories ?? [],
+      lead.signalLang ?? "pl",
+    );
+    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence });
+    const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
+    writeFileSync(ref, report.deliverable);
+    store.recordExecution(lead.id, report.gate, report.confidence, ref);
+    items.push({ leadId: lead.id, capability: report.outcomes[0]?.task.capability ?? "?", confidence: report.confidence, gate: report.gate, ref });
+    if (report.gate === "auto") auto++;
+    else reviewN++;
+  }
+  store.save();
+  return { executed: items.length, auto, review: reviewN, items };
 }
 
 export async function runSend(store: Store, cfg: AgentConfig, nowMs = Date.now()): Promise<SendSummary> {

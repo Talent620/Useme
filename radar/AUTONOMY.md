@@ -22,6 +22,7 @@ cykle są idempotentne (ten sam sygnał nigdy nie tworzy dwóch leadów ani dwó
 | Zakolejkowanie wysokopunktowych leadów do outreachu | 🤖 agent |
 | **Akceptacja wysyłki (bramka)** | 🧑 Ty (lub `autoApprove:true`) |
 | Wysłanie zaakceptowanej oferty + limit dzienny | 🤖 agent |
+| **Realizacja wygranego zlecenia (deliverable)** | 🤖 agent (bramka: auto/review wg pewności) |
 | Dodanie/zmiana źródeł i ICP | 🧑 Ty (raz, w `config/tenants.json`) |
 
 Człowiek konfiguruje raz i akceptuje wysyłki. Reszta jest automatyczna.
@@ -118,6 +119,18 @@ node agent/cli.ts onboard \
   cykle automatycznie go obsługują** — nowy klient zaczyna dostawać digesty bez
   Twojej interwencji.
 - To samo przez MCP (`radar_onboard`) — Twój agent może onboardować ludzi w rozmowie.
+
+## Autonomiczna realizacja zleceń (silnik egzekucji)
+Po oznaczeniu leada jako `WON` agent **wykonuje zlecenie**: planuje, produkuje
+deliverable (artykuł / landing HTML / audyt / specyfikacja), sam się weryfikuje
+względem kryteriów akceptacji i bramkuje wynik (auto / do przeglądu).
+
+```bash
+node agent/cli.ts mark <leadId> WON
+node agent/cli.ts execute        # deliverable → data/deliverables/
+```
+Domyślnie `settings.execution.autoExecuteOnWon=true` — realizacja dzieje się w
+cyklu, bez Twojej interwencji. Szczegóły: [`EXECUTION.md`](./EXECUTION.md).
 
 ## Realne źródła (grzeczny crawl)
 Włączasz feed w `config/tenants.json` (`enabled: true`). Live fetch jest dobrym obywatelem:

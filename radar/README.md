@@ -25,6 +25,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Persystencja Postgres/Prisma (swappowalny repo)** | ✅ **3 testy + migracja** ([PERSISTENCE.md](./PERSISTENCE.md)) |
 | **Billing Stripe + plany (limity w runtime)** | ✅ **9 testów** ([BILLING.md](./BILLING.md)) |
 | **Samoobsługowy onboarding + proof-of-value** | ✅ **4 testy** (CLI `onboard`, MCP, `/api/signup`) |
+| **🚀 Autonomiczna realizacja zleceń (silnik egzekucji)** | ✅ **8 testów** ([EXECUTION.md](./EXECUTION.md)) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

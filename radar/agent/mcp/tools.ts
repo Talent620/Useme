@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { runSend, runTrain } from "../actions.ts";
+import { runExecute, runSend, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -36,6 +36,7 @@ export const TOOLS: ToolDef[] = [
     inputSchema: obj({ leadId: { type: "string" }, status: { type: "string", enum: ["WON", "REPLIED", "REJECTED", "SENT"] } }, ["leadId", "status"]),
   },
   { name: "radar_train", description: "Przelicz modele scoringu z wyników WON/LOST.", inputSchema: obj() },
+  { name: "radar_execute", description: "Autonomicznie zrealizuj wygrane (WON) zlecenia: plan→produkcja→samo-weryfikacja→deliverable. Zwraca pewność i bramkę auto/review.", inputSchema: obj() },
   { name: "radar_run_cycle", description: "Uruchom jeden pełny cykl: crawl→enrich→score→draft→dostawa.", inputSchema: obj() },
   {
     name: "radar_onboard",
@@ -125,6 +126,9 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_train":
       return { text: JSON.stringify(runTrain(store, cfg), null, 2) };
+
+    case "radar_execute":
+      return { text: JSON.stringify(await runExecute(store, cfg), null, 2) };
 
     case "radar_run_cycle": {
       const m = await runCycle(store, cfg, Date.now());

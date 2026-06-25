@@ -51,6 +51,7 @@ export interface AgentConfig {
     maxLeadsPerDigest: number;
     outreach?: OutreachSettings;
     learn?: LearnSettings;
+    execution?: ExecutionSettings;
   };
   sources: SourceDef[];
   tenants: TenantDef[];
@@ -64,6 +65,24 @@ export const DEFAULT_OUTREACH: OutreachSettings = {
 };
 
 export const DEFAULT_LEARN: LearnSettings = { autoTrain: true, minExamples: 5 };
+
+export interface ExecutionSettings {
+  /** Master switch for the autonomous execution engine. */
+  enabled: boolean;
+  /** Execute won leads automatically at the end of each cycle. */
+  autoExecuteOnWon: boolean;
+  /** Self-revision budget per task. */
+  maxIterations: number;
+  /** Confidence required to auto-deliver (below => queued for human review). */
+  minConfidence: number;
+}
+
+export const DEFAULT_EXECUTION: ExecutionSettings = {
+  enabled: true,
+  autoExecuteOnWon: true,
+  maxIterations: 3,
+  minConfidence: 80,
+};
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

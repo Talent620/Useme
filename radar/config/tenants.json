@@ -12,6 +12,12 @@
     "learn": {
       "autoTrain": true,
       "minExamples": 5
+    },
+    "execution": {
+      "enabled": true,
+      "autoExecuteOnWon": true,
+      "maxIterations": 3,
+      "minConfidence": 80
     }
   },
   "sources": [

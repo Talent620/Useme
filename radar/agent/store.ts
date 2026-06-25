@@ -30,6 +30,14 @@ export interface StoredLead extends Lead {
   outreachStatus?: OutreachStatus;
   sentAt?: string;
   sentVia?: string;
+  // Captured at creation so the execution engine has the full brief.
+  signalBody?: string;
+  signalCategories?: string[];
+  signalLang?: string;
+  // Autonomous execution state.
+  executionStatus?: "none" | "auto" | "review";
+  executionConfidence?: number;
+  deliverableRef?: string;
 }
 
 interface Db {
@@ -173,6 +181,22 @@ export class Store {
   /** Count sends for a tenant since an ISO timestamp (daily-cap enforcement). */
   sentCountSince(tenantId: string, sinceISO: string): number {
     return this.db.sends.filter((s) => s.tenantId === tenantId && s.at >= sinceISO).length;
+  }
+
+  // -- autonomous execution ----------------------------------------------
+
+  /** Won leads not yet executed — the queue for the execution engine. */
+  executableLeads(): StoredLead[] {
+    return this.db.leads.filter((l) => l.status === "WON" && !l.executionStatus);
+  }
+
+  recordExecution(leadId: string, gate: "auto" | "review", confidence: number, ref: string) {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (l) {
+      l.executionStatus = gate;
+      l.executionConfidence = confidence;
+      l.deliverableRef = ref;
+    }
   }
 
   // -- self-improving scoring --------------------------------------------

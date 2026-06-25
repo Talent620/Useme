@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runSend, runTrain } from "./actions.ts";
+import { runExecute, runSend, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
@@ -31,6 +31,7 @@ async function main() {
       console.log(`  Nowe sygnały:  ${m.newSignals}`);
       console.log(`  Nowe leady:    ${col(String(m.leadsCreated), C.b)}`);
       console.log(`  Do outreachu:  ${col(String(m.queuedForOutreach), C.y)}  ${col("(node agent/cli.ts outbox)", C.dim)}`);
+      console.log(`  Wykonane:      ${col(String(m.executed), C.g)}  ${col("(zlecenia zrealizowane autonomicznie)", C.dim)}`);
       console.log(`  Digesty:       ${m.digests.map((d) => `${d.tenant}:${d.leads}`).join(", ") || "—"}`);
       console.log(col(`  Czas: ${m.durationMs} ms`, C.dim));
       for (const d of m.digests) console.log(col(`  → ${d.ref}`, C.dim));
@@ -125,6 +126,22 @@ async function main() {
       console.log();
       break;
     }
+    case "execute": {
+      const cfg = loadConfig();
+      const before = store.executableLeads().length;
+      if (!before) {
+        console.log(col("  Brak wygranych zleceń do wykonania (oznacz lead jako WON).", C.dim));
+        break;
+      }
+      console.log(col(`\n  Autonomiczna realizacja ${before} zleceń...\n`, C.b));
+      const s = await runExecute(store, cfg);
+      for (const it of s.items) {
+        const g = it.gate === "auto" ? col("AUTO", C.g) : col("REVIEW", C.y);
+        console.log(`  ${g} ${it.leadId} [${it.capability}] jakość ${it.confidence}/100  ${col(it.ref, C.dim)}`);
+      }
+      console.log(col(`\n✓ Wykonano ${s.executed} (auto: ${s.auto}, do przeglądu: ${s.review})`, C.g));
+      break;
+    }
     case "train": {
       const cfg = loadConfig();
       const learn = cfg.settings.learn ?? DEFAULT_LEARN;
@@ -195,6 +212,7 @@ async function main() {
   reject <id>          pomiń lead w outreachu
   send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
+  execute              autonomicznie zrealizuj wygrane zlecenia (deliverable)
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]`);
   }
