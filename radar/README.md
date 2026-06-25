@@ -29,6 +29,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Narzędzia wykonawców: SEO, research z cytowaniami, workflow n8n** | ✅ **13 testów** (`exec/tools/`) |
 | **Graf wielozadaniowy (automation→spec+n8n, ecommerce→landing+treści)** | ✅ |
 | **Orkiestrator: dynamiczna kompozycja narzędzi + generacja obrazu** | ✅ **4 testy** (Higgsfield + fallback SVG) |
+| **Samokalibracja jakości wykonania (2. pętla uczenia)** | ✅ **4 testy** (system sam podnosi poprzeczkę) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

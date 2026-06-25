@@ -55,6 +55,20 @@ Packager → deliverable + confidence + bramka (auto / review)
 - `confidence ≥ minConfidence` i wszystkie zadania zaliczone → **auto** (gotowe do wydania).
 - inaczej → **review** (do przeglądu człowieka). Tłumaczenia bez LLM eskalują automatycznie.
 
+## Samokalibracja jakości (druga pętla uczenia)
+System uczy się z werdyktów klientów o **wykonaniu** (nie tylko o leadach):
+`mark-exec <leadId> ACCEPTED|REVISION|REJECTED`. `exec/quality.ts` buduje model
+jakości per kompetencja i **sam podnosi sobie poprzeczkę** tam, gdzie deliverable
+bywają odrzucane:
+- niska akceptacja → wyższy próg `minConfidence` (więcej trafia do przeglądu) i
+  większy budżet iteracji (więcej samopoprawy przed wydaniem),
+- wysoka akceptacja → próg bazowy.
+
+Bramka egzekucji konsultuje ten model: ten sam deliverable może być „auto" bez
+historii, a „review" po nauczeniu się, że dana kompetencja bywa odrzucana — czyli
+system samodzielnie kalibruje swoją autonomię na podstawie realnych wyników.
+Trening odpala się automatycznie w cyklu; ręcznie: `quality`.
+
 ## Użycie
 ```bash
 node agent/cli.ts mark <leadId> WON     # klient zaakceptował

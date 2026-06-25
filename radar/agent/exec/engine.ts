@@ -6,17 +6,24 @@ import { runCapability, type ExecCtx } from "./capabilities.ts";
 import { review } from "./critic.ts";
 import { planJob } from "./planner.ts";
 import { gather } from "./orchestrator.ts";
+import { gateOpts, type QualityModel } from "./quality.ts";
 import type { ExecutionReport, Job, TaskOutcome } from "./types.ts";
 
 export interface ExecuteOptions {
   maxIterations?: number; // self-revision budget per task
   minConfidence?: number; // gate threshold for autonomous delivery
+  quality?: QualityModel; // learned per-capability quality calibration
 }
 
 export async function executeJob(job: Job, opts: ExecuteOptions = {}): Promise<ExecutionReport> {
-  const maxIterations = opts.maxIterations ?? 3;
-  const minConfidence = opts.minConfidence ?? 80;
   const tasks = planJob(job);
+  // Self-calibrated autonomy: raise the bar where this capability gets rejected.
+  const adj = gateOpts(opts.quality, tasks.map((t) => t.capability), {
+    minConfidence: opts.minConfidence ?? 80,
+    maxIterations: opts.maxIterations ?? 3,
+  });
+  const maxIterations = adj.maxIterations;
+  const minConfidence = adj.minConfidence;
   const outcomes: TaskOutcome[] = [];
 
   for (const task of tasks) {

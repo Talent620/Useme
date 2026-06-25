@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/core/src/index.ts";
+import type { ExecOutcome, QualityModel, QualitySample } from "./exec/quality.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -37,6 +38,8 @@ export interface StoredLead extends Lead {
   // Autonomous execution state.
   executionStatus?: "none" | "auto" | "review";
   executionConfidence?: number;
+  executionCapability?: string;
+  executionOutcome?: ExecOutcome; // client verdict on the deliverable
   deliverableRef?: string;
 }
 
@@ -47,6 +50,7 @@ interface Db {
   deliveries: { id: string; tenantId: string; leadIds: string[]; channel: string; at: string }[];
   sends: { tenantId: string; leadId: string; via: string; at: string }[];
   learned: Record<string, LearnedModel>;
+  qualityModel?: QualityModel;
   sourceState: Record<string, SourceState>;
 }
 
@@ -190,13 +194,37 @@ export class Store {
     return this.db.leads.filter((l) => l.status === "WON" && !l.executionStatus);
   }
 
-  recordExecution(leadId: string, gate: "auto" | "review", confidence: number, ref: string) {
+  recordExecution(leadId: string, gate: "auto" | "review", confidence: number, ref: string, capability?: string) {
     const l = this.db.leads.find((x) => x.id === leadId);
     if (l) {
       l.executionStatus = gate;
       l.executionConfidence = confidence;
       l.deliverableRef = ref;
+      if (capability) l.executionCapability = capability;
     }
+  }
+
+  /** Record the client's verdict on a delivered job — fuel for quality learning. */
+  recordExecutionOutcome(leadId: string, outcome: ExecOutcome): boolean {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (!l) return false;
+    l.executionOutcome = outcome;
+    this.save();
+    return true;
+  }
+
+  /** Labeled samples (capability + outcome) for execution-quality training. */
+  executionQualitySamples(): QualitySample[] {
+    return this.db.leads
+      .filter((l) => l.executionOutcome && l.executionCapability)
+      .map((l) => ({ capability: l.executionCapability!, outcome: l.executionOutcome! }));
+  }
+
+  getQualityModel(): QualityModel | undefined {
+    return this.db.qualityModel;
+  }
+  setQualityModel(model: QualityModel) {
+    this.db.qualityModel = model;
   }
 
   // -- self-improving scoring --------------------------------------------

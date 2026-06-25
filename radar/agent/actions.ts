@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, ROOT, type AgentConfig } from "./config.ts";
 import { effectiveDailyCap } from "./billing.ts";
-import { executeJob, jobFromLead } from "./exec/index.ts";
+import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
 import type { Store } from "./store.ts";
 
@@ -71,6 +71,7 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
   const dir = resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "deliverables");
   mkdirSync(dir, { recursive: true });
 
+  const quality = store.getQualityModel(); // self-calibrated autonomy bar
   const items: ExecItem[] = [];
   let auto = 0;
   let reviewN = 0;
@@ -81,7 +82,7 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
       lead.signalCategories ?? [],
       lead.signalLang ?? "pl",
     );
-    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence });
+    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence, quality });
     const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
     writeFileSync(ref, report.deliverable);
     // Also write each artifact in its native format (openable .html, .txt).
@@ -90,13 +91,22 @@ export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSu
         writeFileSync(resolve(dir, `${lead.tenantId}_${lead.id}.${o.artifact.format}`), o.artifact.content);
       }
     }
-    store.recordExecution(lead.id, report.gate, report.confidence, ref);
-    items.push({ leadId: lead.id, capability: report.outcomes[0]?.task.capability ?? "?", confidence: report.confidence, gate: report.gate, ref });
+    const capability = report.outcomes[0]?.task.capability ?? "?";
+    store.recordExecution(lead.id, report.gate, report.confidence, ref, capability);
+    items.push({ leadId: lead.id, capability, confidence: report.confidence, gate: report.gate, ref });
     if (report.gate === "auto") auto++;
     else reviewN++;
   }
   store.save();
   return { executed: items.length, auto, review: reviewN, items };
+}
+
+/** Train the execution-quality model from client verdicts and persist it. */
+export function runQualityTrain(store: Store, base?: { minConfidence: number; maxIterations: number }): QualityModel {
+  const model = trainQualityModel(store.executionQualitySamples(), base, Date.now());
+  store.setQualityModel(model);
+  store.save();
+  return model;
 }
 
 export async function runSend(store: Store, cfg: AgentConfig, nowMs = Date.now()): Promise<SendSummary> {

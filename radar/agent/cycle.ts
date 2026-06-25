@@ -12,7 +12,7 @@ import {
 } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
-import { runExecute } from "./actions.ts";
+import { runExecute, runQualityTrain } from "./actions.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
@@ -147,6 +147,8 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   if (exec.enabled && exec.autoExecuteOnWon) {
     const e = await runExecute(store, cfg);
     executed = e.executed;
+    // Recalibrate the quality bar from accumulated client verdicts.
+    runQualityTrain(store, { minConfidence: exec.minConfidence, maxIterations: exec.maxIterations });
   }
 
   store.save();

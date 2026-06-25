@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { runExecute, runSend, runTrain } from "../actions.ts";
+import { runExecute, runQualityTrain, runSend, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -37,6 +37,12 @@ export const TOOLS: ToolDef[] = [
   },
   { name: "radar_train", description: "Przelicz modele scoringu z wyników WON/LOST.", inputSchema: obj() },
   { name: "radar_execute", description: "Autonomicznie zrealizuj wygrane (WON) zlecenia: plan→produkcja→samo-weryfikacja→deliverable. Zwraca pewność i bramkę auto/review.", inputSchema: obj() },
+  {
+    name: "radar_mark_exec",
+    description: "Oceń dostarczony deliverable (werdykt klienta). Zasila samokalibrację jakości.",
+    inputSchema: obj({ leadId: { type: "string" }, outcome: { type: "string", enum: ["ACCEPTED", "REVISION", "REJECTED"] } }, ["leadId", "outcome"]),
+  },
+  { name: "radar_quality", description: "Model jakości wykonania per kompetencja (akceptacja, samokalibrowany próg/iteracje).", inputSchema: obj() },
   { name: "radar_run_cycle", description: "Uruchom jeden pełny cykl: crawl→enrich→score→draft→dostawa.", inputSchema: obj() },
   {
     name: "radar_onboard",
@@ -129,6 +135,14 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_execute":
       return { text: JSON.stringify(await runExecute(store, cfg), null, 2) };
+
+    case "radar_mark_exec": {
+      const ok = store.recordExecutionOutcome(arg<string>(args, "leadId") ?? "", (arg<string>(args, "outcome") ?? "") as never);
+      return { text: ok ? "ok" : "brak leada", isError: !ok };
+    }
+
+    case "radar_quality":
+      return { text: JSON.stringify(runQualityTrain(store), null, 2) };
 
     case "radar_run_cycle": {
       const m = await runCycle(store, cfg, Date.now());

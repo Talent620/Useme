@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runSend, runTrain } from "./actions.ts";
+import { runExecute, runQualityTrain, runSend, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
@@ -142,6 +142,28 @@ async function main() {
       console.log(col(`\n✓ Wykonano ${s.executed} (auto: ${s.auto}, do przeglądu: ${s.review})`, C.g));
       break;
     }
+    case "mark-exec": {
+      const [leadId, outcome] = args;
+      const ok = store.recordExecutionOutcome(leadId, outcome as never);
+      console.log(ok ? col(`✓ Wykonanie ${leadId} -> ${outcome}`, C.g) : col(`Brak leada ${leadId}`, C.r));
+      break;
+    }
+    case "quality": {
+      const model = runQualityTrain(store);
+      const caps = Object.values(model.byCapability);
+      if (!caps.length) {
+        console.log(col("  Brak ocen wykonania (użyj: mark-exec <leadId> ACCEPTED|REVISION|REJECTED).", C.dim));
+        break;
+      }
+      console.log(col("\n  Model jakości wykonania (samokalibracja bramki):\n", C.b));
+      for (const q of caps) {
+        const rate = Math.round(q.acceptanceRate * 100);
+        const rc = rate >= 80 ? C.g : rate >= 50 ? C.y : C.r;
+        console.log(`    ${col(q.capability.padEnd(9), C.b)} akceptacja ${col(rate + "%", rc)} (${q.accepted}/${q.n})  → próg ${q.minConfidence}/100, iteracje ${q.maxIterations}`);
+      }
+      console.log();
+      break;
+    }
     case "train": {
       const cfg = loadConfig();
       const learn = cfg.settings.learn ?? DEFAULT_LEARN;
@@ -213,6 +235,8 @@ async function main() {
   send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
   execute              autonomicznie zrealizuj wygrane zlecenia (deliverable)
+  mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
+  quality              model jakości wykonania (samokalibracja bramki)
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]`);
   }
