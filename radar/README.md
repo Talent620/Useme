@@ -39,6 +39,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Panel operatora (pipeline+P&L+prognoza+jakość+TODO) + live w CI** | ✅ **2 testy** (`report`) |
 | **Binarki Windows/Ubuntu/Android + auto-update** | ✅ **6 testów** ([INSTALL.md](./INSTALL.md), [Releases](https://github.com/talent620/useme/releases/latest)) |
 | **Panel webowy `serve` (przejrzysty UI, live, akcje)** | ✅ **4 testy** (wbudowany, zero zależności) |
+| **Zaawansowana autonomia: pamięć, multi-agent, CFO, ceny, CRM, intel** | ✅ **8 testów** ([ADVANCED.md](./ADVANCED.md), [AUDIT.md](../AUDIT.md), [ROADMAP.md](../ROADMAP.md)) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

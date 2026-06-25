@@ -27,6 +27,10 @@
     { "name": "useme", "kind": "job_board", "feed": "https://useme.com/pl/jobs/feed/", "enabled": false },
     { "name": "useme-en", "kind": "job_board", "feed": "https://useme.com/en/jobs/feed/", "enabled": false },
     { "name": "ted-eu", "kind": "tender", "feed": "https://ted.europa.eu/en/rss", "enabled": false },
+    { "name": "hn-jobs", "kind": "job_board", "feed": "https://hnrss.org/jobs", "enabled": false },
+    { "name": "hn-ask", "kind": "social", "feed": "https://hnrss.org/ask", "enabled": false },
+    { "name": "reddit-forhire", "kind": "social", "feed": "https://www.reddit.com/r/forhire/new/.rss", "enabled": false },
+    { "name": "remoteok", "kind": "job_board", "feed": "https://remoteok.com/remote-dev-jobs.rss", "enabled": false },
     { "name": "rss-generic", "kind": "rss", "feed": "https://example.com/feed.xml", "enabled": false }
   ],
   "tenants": [

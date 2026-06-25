@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runExecuteLead, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -113,7 +113,39 @@ async function main() {
     case "mark": {
       const [leadId, status] = args;
       const ok = store.setLeadStatus(leadId, status as never);
+      // Feed the long-term memory / data moat on closed deals.
+      if (ok && status === "WON") recordToMemory(store, leadId!, "win");
+      if (ok && status === "REJECTED") recordToMemory(store, leadId!, "loss");
       console.log(ok ? col(`✓ ${leadId} -> ${status}`, C.g) : col(`Brak leada ${leadId}`, C.r));
+      break;
+    }
+    case "board": {
+      const b = runBoard(store, loadConfig());
+      console.log(col("\n  Zespół agentów (boardroom)\n", C.b));
+      for (const a of b.agents) {
+        console.log(`  ${col(a.name.padEnd(10), C.b)} ${col(a.summary, C.dim)}`);
+        for (const r of a.recommendations) console.log(`     • ${r}`);
+      }
+      console.log(col("\n  CEO — priorytety:", C.b));
+      b.priorities.forEach((p, i) => console.log(`    ${i + 1}. ${p}`));
+      console.log();
+      break;
+    }
+    case "finance": {
+      const f = runFinance(store, loadConfig());
+      console.log(col("\n  Agent finansowy (CFO)\n", C.b));
+      console.log(`  Przychód (egzekucja): ${col(f.executionRevenue + " zł", C.g)}  ·  Koszt: ${f.cost} zł  ·  Marża: ${col(f.grossMargin + " zł", f.grossMargin >= 0 ? C.g : C.r)} (${f.marginPct}%)`);
+      console.log(`  MRR: ${f.mrr} zł  ·  ARPU: ${f.arpu} zł  ·  Płacący: ${f.payingTenants}/${f.activeTenants}`);
+      console.log(`  CAC: ${f.cac} zł  ·  LTV: ${f.ltv} zł  ·  LTV/CAC: ${col(String(f.ltvCacRatio), f.ltvCacRatio >= 3 ? C.g : C.y)}  ·  ROI: ${f.roi}x\n`);
+      break;
+    }
+    case "crm": {
+      const { pipeline, followUps } = runCrm(store, loadConfig());
+      console.log(col("\n  CRM — pipeline\n", C.b));
+      for (const [stage, n] of Object.entries(pipeline)) if (n) console.log(`    ${stage.padEnd(12)} ${n}`);
+      console.log(col(`\n  Follow-upy do wysłania: ${followUps.length}`, followUps.length ? C.y : C.dim));
+      for (const f of followUps.slice(0, 8)) console.log(col(`    ${f.leadId} (próba ${f.attempt}): ${f.message.slice(0, 70)}…`, C.dim));
+      console.log();
       break;
     }
     case "onboard": {
@@ -341,6 +373,9 @@ async function main() {
   deliverables         lista gotowych prac (ścieżki do plików)
   mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
   quality              model jakości wykonania (samokalibracja bramki)
+  board                zespół agentów (CEO/Sales/Research/.../Finance) + priorytety
+  finance              agent finansowy: P&L, MRR, CAC, LTV, ROI
+  crm                  pipeline + follow-upy do wysłania
   strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji
   forecast             prognoza popytu + prealokacja (wyprzedź trend)
   report               panel operatora: pełny stan + co trzeba zrobić

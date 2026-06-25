@@ -9,6 +9,11 @@ import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, R
 import { computeFunnel, recommend, type Funnel, type Recommendation } from "./strategy.ts";
 import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
 import { buildReport } from "./report.ts";
+import { memoryPath } from "./config.ts";
+import { Memory } from "./memory.ts";
+import { financials, type Financials } from "./finance.ts";
+import { dueFollowUps, pipeline, type CrmLead } from "./crm.ts";
+import { boardroom, type Boardroom } from "./agents.ts";
 import { effectiveDailyCap } from "./billing.ts";
 import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
@@ -143,6 +148,40 @@ export function runStrategy(store: Store, cfg: AgentConfig, apply?: boolean): St
     }
   }
   return { funnel, recommendations, applied };
+}
+
+/** Multi-agent boardroom: every agent's view + CEO priorities. */
+export function runBoard(store: Store, cfg: AgentConfig): Boardroom {
+  return boardroom(store, cfg, Date.now(), new Memory(memoryPath()));
+}
+
+/** CFO: full financials (P&L, MRR, CAC, LTV, ROI). */
+export function runFinance(store: Store, cfg: AgentConfig): Financials {
+  return financials(store.leadFacts(), cfg.tenants.map((t) => ({ id: t.id, plan: t.plan })));
+}
+
+/** CRM: pipeline by stage + follow-ups due now. */
+export function runCrm(store: Store, cfg: AgentConfig) {
+  const leads: CrmLead[] = cfg.tenants.flatMap((t) => store.leadsForTenant(t.id, 0)).map((l) => ({
+    id: l.id, status: l.status, outreachStatus: l.outreachStatus, sentAt: l.sentAt, title: l.signalTitle,
+  }));
+  return { pipeline: pipeline(leads), followUps: dueFollowUps(leads, Date.now()) };
+}
+
+/** Record a closed deal into long-term memory (data moat) — called on mark. */
+export function recordToMemory(store: Store, leadId: string, outcome: "win" | "loss") {
+  const lead = store.findLead(leadId);
+  if (!lead) return;
+  new Memory(memoryPath()).recordDeal({
+    tenantId: lead.tenantId,
+    category: lead.signalCategories?.[0] ?? "(brak)",
+    source: lead.signalSource ?? "(brak)",
+    channel: lead.sentVia ?? "file",
+    budget: lead.signalBudget,
+    price: lead.signalBudget,
+    outcome,
+    at: new Date().toISOString(),
+  });
 }
 
 /** Build the operator dashboard and persist it to data/report.md. */

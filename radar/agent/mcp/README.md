@@ -33,7 +33,7 @@ node agent/mcp/server.ts        # lub: pnpm mcp
 ```
 Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 
-## Narzędzia (18)
+## Narzędzia (21)
 
 | Narzędzie | Działanie |
 |---|---|
@@ -55,6 +55,9 @@ Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 | `radar_strategy` | agent-CEO: P&L lejka + rekomendacje realokacji (`apply` auto-wyłącza martwe źródła) |
 | `radar_forecast` | prognoza popytu per kategoria (trend/momentum/predykcja) + prealokacja |
 | `radar_report` | panel operatora: pełny stan + lista 'co trzeba zrobić' |
+| `radar_board` | zespół agentów (CEO/Sales/.../Finance) + priorytety CEO |
+| `radar_finance` | agent finansowy: P&L, MRR, CAC, LTV, ROI |
+| `radar_crm` | CRM: pipeline + follow-upy |
 
 ## Przykładowy przepływ w rozmowie z agentem
 > „Uruchom cykl, pokaż leady demo-wp powyżej 80, zaakceptuj najlepszy i wyślij."

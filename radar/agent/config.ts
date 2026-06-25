@@ -101,6 +101,10 @@ export function strategyOverridesPath(): string {
   return resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "strategy-overrides.json");
 }
 
+export function memoryPath(): string {
+  return resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "memory.json");
+}
+
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Path to the runtime overlay where self-service signups append tenants. */
