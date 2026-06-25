@@ -8,6 +8,7 @@ import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/cor
 import type { ExecOutcome, QualityModel, QualitySample } from "./exec/quality.ts";
 import type { LeadFact } from "./strategy.ts";
 import { rank, update as rankUpdate, type RankTable } from "./rank.ts";
+import type { PriceWeights } from "./pricing.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -57,6 +58,7 @@ interface Db {
   sends: { tenantId: string; leadId: string; via: string; at: string }[];
   learned: Record<string, LearnedModel>;
   qualityModel?: QualityModel;
+  priceWeights?: PriceWeights;
   rankTables: Record<string, RankTable>;
   sourceState: Record<string, SourceState>;
 }
@@ -279,6 +281,14 @@ export class Store {
   }
   setQualityModel(model: QualityModel) {
     this.db.qualityModel = model;
+  }
+
+  // -- learned pricing weights (calibrated from real win/loss history) -----
+  getPriceWeights(): PriceWeights | undefined {
+    return this.db.priceWeights;
+  }
+  setPriceWeights(w: PriceWeights) {
+    this.db.priceWeights = w;
   }
 
   // -- self-improving scoring --------------------------------------------

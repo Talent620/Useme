@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -308,6 +308,19 @@ async function main() {
       console.log();
       break;
     }
+    case "price-train": {
+      const r = runPriceTrain(store);
+      console.log(col("\n  Kalibracja modelu cenowego z historii win/loss\n", C.b));
+      if (r.trainedOn < 8) {
+        console.log(col(`  Za mało zamkniętych transakcji z ceną (${r.trainedOn}/8). Oznaczaj WON/REJECTED — model nauczy się sam.`, C.y));
+      } else {
+        console.log(`  Próbki:    ${col(String(r.trainedOn), C.b)}  ·  log-loss: ${col(String(r.logLoss), r.logLoss < 0.6 ? C.g : C.y)}`);
+        console.log(`  Wagi:      bias ${r.weights.bias}  ·  intent ${r.weights.score}  ·  wrażliwość na cenę ${col(String(r.weights.priceFraction), C.b)}`);
+        console.log(col("  ✓ Zapisano — kolejne cykle wyceniają realną elastycznością cenową.", C.g));
+      }
+      console.log();
+      break;
+    }
     case "quality": {
       const model = runQualityTrain(store);
       const caps = Object.values(model.byCapability);
@@ -408,6 +421,7 @@ async function main() {
   forecast             prognoza popytu + prealokacja (wyprzedź trend)
   rank                 RL-lite: czego agent nauczył się z wyników (źródła/kanały/kategorie)
   price <leadId>       rekomendowana cena + P(wygranej) + wartość oczekiwana
+  price-train          skalibruj wagi modelu cenowego z historii win/loss (auto co cykl)
   report               panel operatora: pełny stan + co trzeba zrobić
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]

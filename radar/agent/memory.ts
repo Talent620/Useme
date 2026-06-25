@@ -15,6 +15,7 @@ export interface DealOutcome {
   industry?: string;
   budget?: number;
   price?: number; // what we billed / bid
+  score?: number; // lead intent score 0..100 at decision time (for price calibration)
   outcome: "win" | "loss";
   at: string;
 }
@@ -70,6 +71,22 @@ export class Memory {
     const wins = this.db.deals.filter((d) => d.category === category && d.outcome === "win" && d.price);
     if (!wins.length) return undefined;
     return Math.round(wins.reduce((s, d) => s + (d.price ?? 0), 0) / wins.length);
+  }
+
+  /**
+   * Real (price-fraction, intent, win) samples for price calibration. Only
+   * deals where we know both the budget and what we actually bid carry usable
+   * elasticity signal (fraction = price / budget). Drops degenerate fractions.
+   */
+  priceSamples(): { priceFraction: number; score: number; win: boolean }[] {
+    const out: { priceFraction: number; score: number; win: boolean }[] = [];
+    for (const d of this.db.deals) {
+      if (!d.budget || d.budget <= 0 || !d.price || d.price <= 0) continue;
+      const priceFraction = d.price / d.budget;
+      if (!Number.isFinite(priceFraction) || priceFraction <= 0 || priceFraction > 3) continue;
+      out.push({ priceFraction, score: d.score ?? 50, win: d.outcome === "win" });
+    }
+    return out;
   }
 
   industryProfile(industry: string) {

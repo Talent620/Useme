@@ -54,6 +54,9 @@ export function buildReport(store: Store, cfg: AgentConfig, nowISO: string): str
       L.push(`- ${ns}: ${top}`);
     }
   } else L.push(`- (brak wyników — oznacz leady WON/REJECTED, by uczyć bandita)`);
+  const pw = store.getPriceWeights();
+  if (pw) L.push(`- model cenowy: skalibrowany (wrażliwość na cenę ${pw.priceFraction}, intent ${pw.score})`);
+  else L.push(`- model cenowy: wagi domyślne (skalibruje się z historii: \`price-train\`)`);
   L.push("");
 
   L.push(`## Jakość wykonania`);

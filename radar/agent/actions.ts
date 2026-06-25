@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, ROOT, strategyOverridesPath, type AgentConfig } from "./config.ts";
 import { computeFunnel, recommend, DEFAULT_COSTS, type Funnel, type Recommendation } from "./strategy.ts";
-import { recommendBid, competitionScore } from "./pricing.ts";
+import { recommendBid, competitionScore, calibrateWeights, DEFAULT_WEIGHTS, type CalibrationResult, type PriceWeights } from "./pricing.ts";
 import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
 import { buildReport } from "./report.ts";
 import { memoryPath } from "./config.ts";
@@ -183,7 +183,10 @@ export function recordToMemory(store: Store, leadId: string, outcome: "win" | "l
     source,
     channel,
     budget: lead.signalBudget,
-    price: lead.signalBudget,
+    // The price we actually bid (not the budget) — gives the calibrator real
+    // price-elasticity signal. Falls back to budget for legacy/unpriced leads.
+    price: lead.recommendedPrice ?? lead.signalBudget,
+    score: lead.score,
     outcome,
     at: new Date().toISOString(),
   });
@@ -194,6 +197,24 @@ export function recordToMemory(store: Store, leadId: string, outcome: "win" | "l
   store.updateRank("channel", channel, reward);
   store.updateRank("category", category, reward);
   store.save();
+}
+
+/**
+ * Re-calibrate the pricing weights from accumulated win/loss history and
+ * persist them. Deterministic logistic regression — the system learns its own
+ * price elasticity (at what fraction of budget deals start slipping). Used by
+ * the `price-train` command, the MCP tool, and the autonomous cycle.
+ */
+export function runPriceTrain(store: Store, nowISO?: string): CalibrationResult {
+  const samples = new Memory(memoryPath()).priceSamples();
+  // Always fit from the stable DEFAULT priors over the FULL history, so training
+  // is idempotent: same history → same weights, no slow drift across re-runs.
+  const result = calibrateWeights(samples, DEFAULT_WEIGHTS, { at: nowISO ?? new Date().toISOString() });
+  if (result.trainedOn >= 8) {
+    store.setPriceWeights(result.weights);
+    store.save();
+  }
+  return result;
 }
 
 /** Map an absolute budget to 0..1 so reward weighting is scale-free. */
@@ -236,11 +257,12 @@ export function runPrice(store: Store, leadId: string): PriceResult | null {
   const source = lead.signalSource ?? "(brak)";
   const hist = new Memory(memoryPath()).winRate({ category, source });
   const competitors = store.leadFacts().filter((f) => f.category === category).length;
+  const weights = store.getPriceWeights() ?? DEFAULT_WEIGHTS;
   const bid = recommendBid(lead.signalBudget, DEFAULT_COSTS.perExecution, {
     score: lead.score,
     histWinRate: hist.n >= 3 ? hist.rate : 0.35,
     competition: competitionScore(competitors),
-  });
+  }, weights);
   return {
     recommendedPrice: bid.price,
     fraction: bid.fraction,

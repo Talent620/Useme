@@ -12,13 +12,13 @@ import {
 } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, loadConfig, memoryPath, resolveFeed, tenantICP, type AgentConfig } from "./config.ts";
 import { effectiveAutoApprove, effectiveDigestCap } from "./billing.ts";
-import { runExecute, runQualityTrain, runStrategy } from "./actions.ts";
+import { runExecute, runPriceTrain, runQualityTrain, runStrategy } from "./actions.ts";
 import { fetchListings } from "./fetch.ts";
 import { enrich, TAXONOMY } from "./enrich.ts";
 import { deliver } from "./deliver.ts";
 import { Store } from "./store.ts";
 import { Memory } from "./memory.ts";
-import { recommendBid, competitionScore } from "./pricing.ts";
+import { recommendBid, competitionScore, DEFAULT_WEIGHTS } from "./pricing.ts";
 import { DEFAULT_COSTS } from "./strategy.ts";
 
 export interface CycleMetrics {
@@ -89,6 +89,8 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   const catCounts = new Map<string, number>();
   for (const s of fresh) for (const c of s.categories) catCounts.set(c, (catCounts.get(c) ?? 0) + 1);
   const memory = new Memory(memoryPath());
+  // Use price weights calibrated from real win/loss history (falls back to priors).
+  const priceWeights = store.getPriceWeights() ?? DEFAULT_WEIGHTS;
   // Attach each tenant's learned overlay so scoring reflects past outcomes.
   const learn = cfg.settings.learn ?? DEFAULT_LEARN;
   const icps = cfg.tenants.map((t) => {
@@ -113,7 +115,7 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         score: lead.score,
         histWinRate: hist.n >= 3 ? hist.rate : 0.35,
         competition: competitionScore(catCounts.get(cat) ?? 0),
-      });
+      }, priceWeights);
       const stored = store.upsertLead({
         ...lead,
         recommendedPrice: bid.price,
@@ -158,6 +160,10 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
       }
     }
   }
+
+  // 5b) Re-calibrate pricing weights from real win/loss history (no-op until
+  // enough closed deals accumulate). Deterministic, cheap, fully autonomous.
+  runPriceTrain(store, startedAt);
 
   // 6) Autonomously execute won leads (plan→produce→verify→package).
   let executed = 0;

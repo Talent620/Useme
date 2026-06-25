@@ -17,11 +17,19 @@ najlepszy zwrot. Deterministyczny: eksploracja przez seedowany hash, nie `random
 - `update(table, arm, reward, α)`, `rank(table)`, `pick(table, arms, ε, seed)`,
   `rewardOf(outcome, value)`.
 
-## `pricing.ts` — dynamiczne ceny
+## `pricing.ts` — dynamiczne ceny (samokalibrujące się)
 Logistyczny model prawdopodobieństwa wygranej + grid-search maksymalizujący
 wartość oczekiwaną (cena × P(win) − koszt).
-- `winProbability(fraction, features, weights)`, `recommendBid(budget, cost, features)`,
-  `competitionScore(similarCount)`. Wagi domyślne, dostrajalne z historii (memory).
+- `winProbability(fraction, features, weights)`, `recommendBid(budget, cost, features, weights)`,
+  `competitionScore(similarCount)`.
+- **`calibrateWeights(samples, base, opts)`** — uczy wag (bias, intent, wrażliwość
+  na cenę) z realnej historii win/loss przez deterministyczną regresję logistyczną
+  (stała liczba iteracji, stały lr, init = priory, L2 do priorów). Bez losowości,
+  bez LLM: te same dane → te same wagi. Poniżej `minSamples` zwraca priory
+  (cienka historia nie destabilizuje). System **sam poznaje swoją elastyczność
+  cenową** — przy jakim ułamku budżetu zaczyna przegrywać oferty.
+- `Memory.priceSamples()` dostarcza `{priceFraction, score, win}` z zamkniętych
+  transakcji (fraction = bid / budżet). 3. pętla uczenia (po scoringu i jakości).
 
 ## Zamknięta pętla decyzji (cykl → wynik → nauka)
 Pełne sprzężenie zwrotne, w pełni autonomiczne:
@@ -36,9 +44,14 @@ Pełne sprzężenie zwrotne, w pełni autonomiczne:
 3. **Następne cykle korzystają z nauki** — `runRank` / `radar_rank` / sekcja w
    panelu pokazują, w co agent powinien się przechylać; `runPrice` / `radar_price`
    re-wycenia lead na żądanie z aktualnym stanem pipeline'u.
-- Akcje: `runRank(store)`, `runPrice(store, leadId)`. Testy:
+4. **Cena uczy się elastyczności** — `runPriceTrain` (auto co cykl, krok 5b)
+   kalibruje wagi modelu cenowego z `Memory.priceSamples()`; cykl i `runPrice`
+   używają wyuczonych wag (`store.getPriceWeights()`), z fallbackiem do priorów.
+- Akcje: `runRank(store)`, `runPrice(store, leadId)`, `runPriceTrain(store)`. Testy:
   `agent/test/closure.test.ts` (cena na każdym leadzie, wzrost wartości ramienia
-  po WON, brak wzrostu po REJECTED, trzy osie rankingu).
+  po WON, brak wzrostu po REJECTED, trzy osie rankingu) oraz
+  `agent/test/pricing-calibrate.test.ts` (nauka elastyczności, determinizm,
+  persystencja wag, próbki z pamięci).
 
 ## `finance.ts` — agent finansowy (CFO)
 Pełna ekonomia: P&L, MRR, marża, ROI, **CAC, LTV, LTV/CAC**, prognoza przychodu.
@@ -64,11 +77,12 @@ istniejącymi silnikami.
 - `boardroom(store, cfg, now, memory?)`.
 
 ## Sterowanie
-- CLI: `board`, `finance`, `crm`, `rank`, `price <leadId>` (+ `mark` karmi pamięć i bandita).
-- MCP: `radar_board`, `radar_finance`, `radar_crm`, `radar_rank`, `radar_price`
-  (łącznie 23 narzędzia).
+- CLI: `board`, `finance`, `crm`, `rank`, `price <leadId>`, `price-train`
+  (+ `mark` karmi pamięć i bandita).
+- MCP: `radar_board`, `radar_finance`, `radar_crm`, `radar_rank`, `radar_price`,
+  `radar_price_train` (łącznie 24 narzędzia).
 - Akcje współdzielone: `runBoard`, `runFinance`, `runCrm`, `runRank`, `runPrice`,
-  `recordToMemory`.
+  `runPriceTrain`, `recordToMemory`.
 
 ## Zasady projektowe (utrzymane)
 Pełna kompatybilność wsteczna · zero atrap/TODO · każda funkcja z testami
