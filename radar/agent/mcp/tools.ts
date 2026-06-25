@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { runExecute, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
+import { runExecute, runExecuteLead, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -37,6 +37,7 @@ export const TOOLS: ToolDef[] = [
   },
   { name: "radar_train", description: "Przelicz modele scoringu z wyników WON/LOST.", inputSchema: obj() },
   { name: "radar_execute", description: "Autonomicznie zrealizuj wygrane (WON) zlecenia: plan→produkcja→samo-weryfikacja→deliverable. Zwraca pewność i bramkę auto/review.", inputSchema: obj() },
+  { name: "radar_work", description: "Wykonaj konkretne zlecenie teraz (na żądanie) — pełny deliverable + ścieżki plików.", inputSchema: obj({ leadId: { type: "string" } }, ["leadId"]) },
   {
     name: "radar_mark_exec",
     description: "Oceń dostarczony deliverable (werdykt klienta). Zasila samokalibrację jakości.",
@@ -138,6 +139,11 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_execute":
       return { text: JSON.stringify(await runExecute(store, cfg), null, 2) };
+
+    case "radar_work": {
+      const item = await runExecuteLead(store, cfg, arg<string>(args, "leadId") ?? "");
+      return item ? { text: JSON.stringify(item, null, 2) } : { text: "brak leada", isError: true };
+    }
 
     case "radar_mark_exec": {
       const ok = store.recordExecutionOutcome(arg<string>(args, "leadId") ?? "", (arg<string>(args, "outcome") ?? "") as never);

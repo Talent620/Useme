@@ -1,6 +1,6 @@
 # RadarPL 🛰️
 
-> **Binarki do pobrania (Windows `.exe` + Ubuntu) z auto-aktualizacją:** [INSTALL.md](./INSTALL.md) · [Releases](https://github.com/talent620/useme/releases/latest)
+> **Do pobrania (Windows `.exe` + Ubuntu + Android `.apk`) z auto-aktualizacją:** [INSTALL.md](./INSTALL.md) · [Releases](https://github.com/talent620/useme/releases/latest)
 
 
 **Silnik sygnałów popytu z publicznych danych.** Z job-boardów, przetargów,

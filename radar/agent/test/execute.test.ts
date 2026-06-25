@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { runCycle } from "../cycle.ts";
-import { runExecute } from "../actions.ts";
+import { runExecute, runExecuteLead } from "../actions.ts";
 import { loadConfig } from "../config.ts";
 import { Store } from "../store.ts";
 
@@ -45,6 +45,18 @@ test("won lead is autonomously executed into a deliverable file", async () => {
   // Recorded + no longer in the executable queue (idempotent).
   assert.equal(store.findLead(lead.id)!.executionStatus, item.gate);
   assert.equal(store.executableLeads().length, 0);
+});
+
+test("runExecuteLead executes a specific lead on demand and writes files", async () => {
+  freshEnv();
+  const store = new Store(process.env.RADAR_STORE!);
+  await runCycle(store, loadConfig(), NOW);
+  const lead = store.leadsForTenant("demo-wp")[0]!;
+  const item = await runExecuteLead(store, loadConfig(), lead.id);
+  assert.ok(item, "returns an item");
+  assert.ok(item!.confidence > 0);
+  assert.ok(item!.files.length >= 1 && existsSync(item!.files[0]!), "deliverable file written");
+  assert.equal(await runExecuteLead(store, loadConfig(), "nope"), null);
 });
 
 test("autoExecuteOnWon runs execution inside the cycle", async () => {

@@ -2,6 +2,9 @@ node_modules/
 data/
 dist/
 .next/
+mobile/android/
+mobile/node_modules/
+mobile/*.apk
 dist/
 build/
 .env

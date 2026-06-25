@@ -12,7 +12,7 @@ import { buildReport } from "./report.ts";
 import { effectiveDailyCap } from "./billing.ts";
 import { executeJob, jobFromLead, trainQualityModel, type QualityModel } from "./exec/index.ts";
 import { sendOutreach } from "./outreach.ts";
-import type { Store } from "./store.ts";
+import type { Store, StoredLead } from "./store.ts";
 
 export interface TrainResult {
   tenantId: string;
@@ -60,6 +60,7 @@ export interface ExecItem {
   confidence: number;
   gate: "auto" | "review";
   ref: string;
+  files: string[]; // all written deliverable files (md + native)
 }
 export interface ExecSummary {
   executed: number;
@@ -68,40 +69,50 @@ export interface ExecSummary {
   items: ExecItem[];
 }
 
-/** Autonomously execute won leads: plan → produce → self-verify → package. */
-export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSummary> {
+/** Execute a single lead end-to-end (plan→produce→verify→repair→package→save). */
+async function execOneLead(store: Store, cfg: AgentConfig, lead: StoredLead, dir: string): Promise<ExecItem> {
   const exec = cfg.settings.execution ?? DEFAULT_EXECUTION;
+  const quality = store.getQualityModel();
+  const job = jobFromLead(lead, lead.signalBody ?? lead.signalTitle, lead.signalCategories ?? [], lead.signalLang ?? "pl");
+  const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence, quality, candidates: exec.candidates, targetScore: exec.targetScore });
+  const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
+  writeFileSync(ref, report.deliverable);
+  const files = [ref];
+  for (const o of report.outcomes) {
+    if (o.artifact.format !== "md") {
+      const f = resolve(dir, `${lead.tenantId}_${lead.id}.${o.artifact.format}`);
+      writeFileSync(f, o.artifact.content);
+      files.push(f);
+    }
+  }
+  const capability = report.outcomes[0]?.task.capability ?? "?";
+  store.recordExecution(lead.id, report.gate, report.confidence, ref, capability);
+  return { leadId: lead.id, capability, confidence: report.confidence, gate: report.gate, ref, files };
+}
+
+/** Autonomously execute all won leads: plan → produce → self-verify → package. */
+export async function runExecute(store: Store, cfg: AgentConfig): Promise<ExecSummary> {
   const dir = resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "deliverables");
   mkdirSync(dir, { recursive: true });
-
-  const quality = store.getQualityModel(); // self-calibrated autonomy bar
   const items: ExecItem[] = [];
-  let auto = 0;
-  let reviewN = 0;
-  for (const lead of store.executableLeads()) {
-    const job = jobFromLead(
-      lead,
-      lead.signalBody ?? lead.signalTitle,
-      lead.signalCategories ?? [],
-      lead.signalLang ?? "pl",
-    );
-    const report = await executeJob(job, { maxIterations: exec.maxIterations, minConfidence: exec.minConfidence, quality, candidates: exec.candidates, targetScore: exec.targetScore });
-    const ref = resolve(dir, `${lead.tenantId}_${lead.id}.md`);
-    writeFileSync(ref, report.deliverable);
-    // Also write each artifact in its native format (openable .html, .txt).
-    for (const o of report.outcomes) {
-      if (o.artifact.format !== "md") {
-        writeFileSync(resolve(dir, `${lead.tenantId}_${lead.id}.${o.artifact.format}`), o.artifact.content);
-      }
-    }
-    const capability = report.outcomes[0]?.task.capability ?? "?";
-    store.recordExecution(lead.id, report.gate, report.confidence, ref, capability);
-    items.push({ leadId: lead.id, capability, confidence: report.confidence, gate: report.gate, ref });
-    if (report.gate === "auto") auto++;
-    else reviewN++;
-  }
+  for (const lead of store.executableLeads()) items.push(await execOneLead(store, cfg, lead, dir));
   store.save();
-  return { executed: items.length, auto, review: reviewN, items };
+  return summarize(items);
+}
+
+/** Execute one specific lead on demand (even if not yet WON). */
+export async function runExecuteLead(store: Store, cfg: AgentConfig, leadId: string): Promise<ExecItem | null> {
+  const lead = store.findLead(leadId);
+  if (!lead) return null;
+  const dir = resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "deliverables");
+  mkdirSync(dir, { recursive: true });
+  const item = await execOneLead(store, cfg, lead, dir);
+  store.save();
+  return item;
+}
+
+function summarize(items: ExecItem[]): ExecSummary {
+  return { executed: items.length, auto: items.filter((i) => i.gate === "auto").length, review: items.filter((i) => i.gate === "review").length, items };
 }
 
 export interface StrategyResult {

@@ -9,8 +9,13 @@ Najnowsze wydanie: **[GitHub Releases](https://github.com/talent620/useme/releas
 
 | System | Plik | Jak uruchomić |
 |---|---|---|
-| Windows | `radar-windows.exe` | pobierz i uruchom (np. `radar-windows.exe status`) |
-| Ubuntu/Linux | `radar-linux` | `chmod +x radar-linux && ./radar-linux status` |
+| Windows | `radar-windows.exe` | pobierz i uruchom (np. `radar-windows.exe auto`) |
+| Ubuntu/Linux | `radar-linux` | `chmod +x radar-linux && ./radar-linux auto` |
+| Android | `radar-android.apk` | zainstaluj (zezwól na „nieznane źródła") — mobilny panel operatora |
+
+> **Android (APK):** to panel sterowania — agent wykonuje zlecenia w chmurze/na
+> serwerze, a aplikacja pokazuje leady i status (podajesz adres swojego RadarPL).
+> Pełna autonomia (cron, egzekucja) działa na desktopie/serwerze (`auto`/`loop`).
 
 > Sumy kontrolne: `SHA256SUMS.txt` w tym samym wydaniu (`sha256sum -c SHA256SUMS.txt`).
 

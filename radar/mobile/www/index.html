@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RadarPL — panel operatora</title>
+  <style>
+    :root { --brand:#4f46e5; --bg:#0f172a; --card:#1e293b; --txt:#e2e8f0; --mut:#94a3b8; --ok:#22c55e; --warn:#f59e0b; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--txt); padding:16px 16px 40px; }
+    header { display:flex; align-items:center; gap:10px; padding:8px 0 16px; }
+    header h1 { font-size:20px; margin:0; }
+    .logo { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#4f46e5,#06b6d4); }
+    .card { background:var(--card); border-radius:14px; padding:14px; margin-bottom:12px; }
+    .row { display:flex; gap:8px; }
+    input { flex:1; padding:12px; border-radius:10px; border:1px solid #334155; background:#0b1220; color:var(--txt); font-size:15px; }
+    button { padding:12px 14px; border:0; border-radius:10px; background:var(--brand); color:#fff; font-size:15px; font-weight:600; }
+    button.sec { background:#334155; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .stat { background:#0b1220; border-radius:10px; padding:12px; text-align:center; }
+    .stat b { font-size:22px; display:block; }
+    .stat span { color:var(--mut); font-size:12px; }
+    .lead { padding:10px; border-bottom:1px solid #334155; }
+    .lead:last-child { border-bottom:0; }
+    .score { display:inline-block; min-width:34px; text-align:center; border-radius:6px; padding:2px 6px; font-weight:700; font-size:13px; }
+    .muted { color:var(--mut); font-size:13px; }
+    .dl a { color:#7dd3fc; text-decoration:none; display:block; padding:6px 0; }
+    h3 { margin:4px 0 10px; font-size:15px; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+  </style>
+</head>
+<body>
+  <header><div class="logo"></div><h1>RadarPL</h1></header>
+
+  <div class="card">
+    <h3>Połącz z agentem</h3>
+    <div class="row">
+      <input id="url" placeholder="https://twoj-agent.pl" inputmode="url">
+      <button onclick="connect()">Połącz</button>
+    </div>
+    <p class="muted" id="hint">Podaj adres swojego RadarPL (web API). Agent wykonuje zlecenia w chmurze — telefon nimi steruje.</p>
+  </div>
+
+  <div class="card">
+    <h3>Pulpit</h3>
+    <div class="grid">
+      <div class="stat"><b id="s-leads">—</b><span>Leady</span></div>
+      <div class="stat"><b id="s-status">—</b><span>Status</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Leady wg intencji</h3>
+    <div id="leads"><p class="muted">Połącz, aby pobrać leady (GET /api/leads).</p></div>
+  </div>
+
+  <div class="card dl">
+    <h3>Wersje desktop</h3>
+    <a href="https://github.com/Talent620/Useme/releases/latest" target="_blank">⬇ Windows (.exe) i Ubuntu (linux) — najnowsze wydanie</a>
+    <p class="muted">Pełny autonomiczny agent (cron, egzekucja, panel) działa na desktopie/serwerze.</p>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const scoreColor = (s) => s >= 70 ? '#16a34a' : s >= 50 ? '#ca8a04' : '#475569';
+
+    async function connect() {
+      let base = $('url').value.trim().replace(/\/$/, '');
+      if (!base) { $('hint').textContent = 'Podaj adres URL agenta.'; return; }
+      localStorage.setItem('radar_url', base);
+      $('hint').textContent = 'Łączenie z ' + base + ' …';
+      try {
+        const h = await fetch(base + '/api/health').then(r => r.json()).catch(() => null);
+        $('s-status').textContent = h && h.status ? h.status : 'offline';
+        const tenant = localStorage.getItem('radar_tenant') || 'self';
+        const data = await fetch(base + '/api/leads?tenantId=' + tenant).then(r => r.json());
+        $('s-leads').textContent = data.count ?? (data.leads ? data.leads.length : 0);
+        renderLeads(data.leads || []);
+        $('hint').textContent = 'Połączono.';
+      } catch (e) {
+        $('hint').textContent = 'Nie udało się połączyć (sprawdź URL i CORS).';
+      }
+    }
+
+    function renderLeads(leads) {
+      const el = $('leads');
+      if (!leads.length) { el.innerHTML = '<p class="muted">Brak leadów.</p>'; return; }
+      el.innerHTML = leads.slice(0, 25).map(l => {
+        const s = l.score ?? 0;
+        return '<div class="lead"><span class="score" style="background:' + scoreColor(s) + '">' + s + '</span> ' +
+          (l.signal?.title || l.signalTitle || l.title || '—') +
+          '<div class="muted">' + (l.status || '') + (l.signal?.budget ? ' · ' + l.signal.budget + ' zł' : '') + '</div></div>';
+      }).join('');
+    }
+
+    const saved = localStorage.getItem('radar_url');
+    if (saved) { $('url').value = saved; connect(); }
+  </script>
+</body>
+</html>

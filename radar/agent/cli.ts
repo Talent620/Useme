@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { runExecute, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { runExecute, runExecuteLead, runForecast, runQualityTrain, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -192,6 +192,35 @@ async function main() {
       console.log();
       break;
     }
+    case "auto": {
+      // One button: run a full autonomous cycle, then surface the operator report.
+      const cfg = loadConfig();
+      const m = await runCycle(store, cfg, Date.now());
+      console.log(col(`✓ Cykl: ${m.newSignals} nowych sygnałów, ${m.leadsCreated} leadów, ${m.executed} zleceń wykonanych`, C.g));
+      const { ref } = runReport(store, cfg, new Date().toISOString());
+      console.log(col(`  Panel: ${ref}  (node agent/cli.ts report)`, C.dim));
+      break;
+    }
+    case "work": {
+      const item = await runExecuteLead(store, loadConfig(), args[0] ?? "");
+      if (!item) return fail(`Brak leada ${args[0]}`);
+      const g = item.gate === "auto" ? col("AUTO", C.g) : col("REVIEW", C.y);
+      console.log(`  ${g} ${item.leadId} [${item.capability}] jakość ${item.confidence}/100`);
+      for (const f of item.files) console.log(col(`    → ${f}`, C.dim));
+      break;
+    }
+    case "deliverables": {
+      const dels = store.deliverables();
+      if (!dels.length) { console.log(col("  Brak wykonanych zleceń (mark <id> WON → execute).", C.dim)); break; }
+      console.log(col(`\n  Wykonane zlecenia (${dels.length}):\n`, C.b));
+      for (const d of dels) {
+        const g = d.gate === "auto" ? col("AUTO", C.g) : col("REVIEW", C.y);
+        console.log(`    ${g} ${d.capability ?? "?"} ${d.confidence ?? "?"}/100  ${d.title}${d.outcome ? col(" · " + d.outcome, C.dim) : ""}`);
+        console.log(col(`        ${d.ref}`, C.dim));
+      }
+      console.log();
+      break;
+    }
     case "report": {
       const { markdown, ref } = runReport(store, loadConfig(), new Date().toISOString());
       console.log(markdown);
@@ -299,7 +328,10 @@ async function main() {
   reject <id>          pomiń lead w outreachu
   send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
+  auto                 JEDEN PRZYCISK: pełny cykl + wykonanie + panel
   execute              autonomicznie zrealizuj wygrane zlecenia (deliverable)
+  work <leadId>        wykonaj konkretne zlecenie teraz (na żądanie)
+  deliverables         lista gotowych prac (ścieżki do plików)
   mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
   quality              model jakości wykonania (samokalibracja bramki)
   strategy [--apply]   agent-CEO: P&L lejka + rekomendacje realokacji

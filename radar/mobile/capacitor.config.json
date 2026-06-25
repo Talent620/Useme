@@ -1,0 +1,8 @@
+{
+  "appId": "pl.radar.operator",
+  "appName": "RadarPL",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}
