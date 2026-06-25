@@ -3,15 +3,16 @@
 // upgrade. `depth` grows on revision so the engine can climb to passing quality.
 
 import { complete } from "../llm.ts";
-import { allUrls, fetchHtml, firstUrl } from "./tools/web.ts";
-import { analyzeHtml, auditFindings, renderAuditReport } from "./tools/seo.ts";
-import { gatherSources, synthesizeWithCitations } from "./tools/research.ts";
+import { renderAuditReport } from "./tools/seo.ts";
+import { synthesizeWithCitations } from "./tools/research.ts";
 import { renderWorkflowJson } from "./tools/scaffold.ts";
+import type { ToolBundle } from "./orchestrator.ts";
 import type { Artifact, Capability, Job, TaskSpec } from "./types.ts";
 
 export interface ExecCtx {
   depth: number; // 1..N, increases on revision
   hints: string[]; // critic issues from the previous round
+  bundle?: ToolBundle; // tools the orchestrator gathered for this job
 }
 
 function sections(task: TaskSpec): string[] {
@@ -50,14 +51,11 @@ async function writer(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact>
   const kw = keywords(task).length ? keywords(task) : job.categories;
   const perSection = 5 + ctx.depth * 2; // more depth => longer
 
-  // Tool-using path: ground the article in real sources with citations.
-  const urls = allUrls(job.brief);
-  if (urls.length) {
-    const sources = await gatherSources(urls);
-    if (sources.length) {
-      const content = synthesizeWithCitations(job.title, sources, kw, secs);
-      return { taskId: task.id, format: "md", content, meta: { engine: "tool:research", sources: sources.length } };
-    }
+  // Tool-using path: ground the article in sources the orchestrator gathered.
+  const sources = ctx.bundle?.research;
+  if (sources && sources.length) {
+    const content = synthesizeWithCitations(job.title, sources, kw, secs);
+    return { taskId: task.id, format: "md", content, meta: { engine: "tool:research", sources: sources.length } };
   }
 
   const llm = await maybeLLM(
@@ -94,7 +92,12 @@ async function landing(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact
     description: desc,
     areaServed: "PL",
   });
-  const svgHero = `<svg class="art" viewBox="0 0 600 200" role="img" aria-label="ilustracja"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="600" height="200" rx="16" fill="url(#g)"/></svg>`;
+  const img = ctx.bundle?.image;
+  const svgHero = img
+    ? img.kind === "svg" && img.svg
+      ? img.svg.replace("<svg ", '<svg class="art" ')
+      : `<img class="art" src="${img.src}" alt="${job.title}">`
+    : `<svg class="art" viewBox="0 0 600 200" role="img" aria-label="ilustracja"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="600" height="200" rx="16" fill="url(#g)"/></svg>`;
   const content = `<!doctype html>
 <html lang="${job.lang}">
 <head>
@@ -126,23 +129,17 @@ ${feat}
 </html>`;
   // Asset manifest: prompts a downstream image generator (e.g. Higgsfield) can fulfill.
   const assetManifest = features.map((f) => ({ slot: f, prompt: `nowoczesna ilustracja: ${f}, ${job.title}, czysty styl, gradient` }));
-  return { taskId: task.id, format: "html", content, meta: { engine: "template", depth: ctx.depth, assets: assetManifest } };
+  return { taskId: task.id, format: "html", content, meta: { engine: "template", depth: ctx.depth, hero: img?.kind ?? "default", assets: assetManifest } };
 }
 
 async function audit(task: TaskSpec, job: Job, ctx: ExecCtx): Promise<Artifact> {
   const kw = keywords(task).length ? keywords(task) : job.categories;
 
-  // Tool-using path: if the brief references a site, analyze it for real.
-  const url = firstUrl(job.brief);
-  if (url) {
-    try {
-      const html = await fetchHtml(url);
-      const signals = analyzeHtml(html, url.startsWith("file:") ? undefined : url);
-      const report = renderAuditReport(job.title, signals, auditFindings(signals));
-      return { taskId: task.id, format: "md", content: report, meta: { engine: "tool:seo", url } };
-    } catch {
-      /* unreachable site -> fall through to LLM/template */
-    }
+  // Tool-using path: use the real on-page analysis the orchestrator produced.
+  const seo = ctx.bundle?.seo;
+  if (seo) {
+    const report = renderAuditReport(job.title, seo.signals, seo.findings);
+    return { taskId: task.id, format: "md", content: report, meta: { engine: "tool:seo", url: seo.url } };
   }
 
   const llm = await maybeLLM(

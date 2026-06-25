@@ -28,6 +28,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **🚀 Autonomiczna realizacja zleceń (silnik egzekucji)** | ✅ **8 testów** ([EXECUTION.md](./EXECUTION.md)) |
 | **Narzędzia wykonawców: SEO, research z cytowaniami, workflow n8n** | ✅ **13 testów** (`exec/tools/`) |
 | **Graf wielozadaniowy (automation→spec+n8n, ecommerce→landing+treści)** | ✅ |
+| **Orkiestrator: dynamiczna kompozycja narzędzi + generacja obrazu** | ✅ **4 testy** (Higgsfield + fallback SVG) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

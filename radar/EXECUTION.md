@@ -20,9 +20,13 @@ Artifact ──► Critic — ocena 0..100 względem kryteriów (deterministyczn
 Packager → deliverable + confidence + bramka (auto / review)
 ```
 
-- **Planner** (`exec/planner.ts`) — z kategorii wybiera kompetencję i definiuje
+- **Planner** (`exec/planner.ts`) — z kategorii wybiera kompetencję(-e) i definiuje
   kryteria akceptacji (min. długość, wymagane sekcje, pokrycie słów kluczowych,
-  brak placeholderów, poprawność HTML).
+  brak placeholderów, poprawność HTML/JSON).
+- **Orkiestrator** (`exec/orchestrator.ts`) — **dynamiczna kompozycja narzędzi**:
+  zamiast sztywnych ścieżek w wykonawcach, inspekcjonuje zlecenie + kompetencję i
+  uruchamia tylko pasujące narzędzia (research / SEO / generacja obrazu), składając
+  `ToolBundle`, który wykonawca konsumuje. Tak ekspert dobiera narzędzia do zadania.
 - **Wykonawcy** (`exec/capabilities.ts`) — `writer`, `landing` (HTML), `audit`,
   `spec`, `translate`. Deterministyczny baseline działa offline; z `OPENAI_API_KEY`
   warstwa LLM podnosi jakość do pełnej prozy/kodu.

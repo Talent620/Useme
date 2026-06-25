@@ -5,6 +5,7 @@
 import { runCapability, type ExecCtx } from "./capabilities.ts";
 import { review } from "./critic.ts";
 import { planJob } from "./planner.ts";
+import { gather } from "./orchestrator.ts";
 import type { ExecutionReport, Job, TaskOutcome } from "./types.ts";
 
 export interface ExecuteOptions {
@@ -19,7 +20,9 @@ export async function executeJob(job: Job, opts: ExecuteOptions = {}): Promise<E
   const outcomes: TaskOutcome[] = [];
 
   for (const task of tasks) {
-    const ctx: ExecCtx = { depth: 1, hints: [] };
+    // Orchestrator composes the tools this task needs (research/seo/image…).
+    const bundle = await gather(job, task.capability);
+    const ctx: ExecCtx = { depth: 1, hints: [], bundle };
     let best: TaskOutcome | null = null;
 
     for (let i = 1; i <= maxIterations; i++) {
