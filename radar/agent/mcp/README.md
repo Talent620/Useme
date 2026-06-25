@@ -33,7 +33,7 @@ node agent/mcp/server.ts        # lub: pnpm mcp
 ```
 Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 
-## Narzędzia (10)
+## Narzędzia (11)
 
 | Narzędzie | Działanie |
 |---|---|
@@ -47,6 +47,7 @@ Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 | `radar_mark` | ustaw wynik (WON/REPLIED/REJECTED) → zasila uczenie |
 | `radar_train` | przelicz modele scoringu |
 | `radar_run_cycle` | pełny cykl crawl→score→draft→dostawa |
+| `radar_onboard` | z opisu freelancera: auto-ICP + proof-of-value (+`register`) |
 
 ## Przykładowy przepływ w rozmowie z agentem
 > „Uruchom cykl, pokaż leady demo-wp powyżej 80, zaakceptuj najlepszy i wyślij."

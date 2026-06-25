@@ -101,6 +101,24 @@ node agent/cli.ts draft <leadId>     # gotowy draft do skopiowania
 node agent/cli.ts mark <leadId> WON  # sprzężenie zwrotne (uczy scoring w fazie 2)
 ```
 
+## Samoobsługowy onboarding (flywheel akwizycji)
+Z opisu freelancera agent buduje ICP + profil nadawcy i od razu pokazuje
+**proof-of-value** — leady, które dostałby teraz. To mechanika konwersji: klient
+widzi wartość, zanim zapłaci. Zero ręcznej konfiguracji per klient.
+
+```bash
+node agent/cli.ts onboard \
+  --name "Marek" --email marek@x.pl \
+  --headline "Stawiam sklepy WooCommerce na WordPress i automatyzacje n8n" \
+  --min 1000 --register     # --register => zapis do stałego monitoringu
+```
+
+- Bez `--register` to tylko podgląd (np. na landing page przez `POST /api/signup`).
+- Z `--register` tenant trafia do overlay (`data/tenants-extra.json`), a **kolejne
+  cykle automatycznie go obsługują** — nowy klient zaczyna dostawać digesty bez
+  Twojej interwencji.
+- To samo przez MCP (`radar_onboard`) — Twój agent może onboardować ludzi w rozmowie.
+
 ## Realne źródła (grzeczny crawl)
 Włączasz feed w `config/tenants.json` (`enabled: true`). Live fetch jest dobrym obywatelem:
 - **robots.txt** — przed pobraniem sprawdzamy, czy nasz UA ma wstęp (wyłącznik awaryjny `CRAWL_IGNORE_ROBOTS=1`, używaj świadomie).

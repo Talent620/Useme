@@ -1,7 +1,7 @@
 // Loads the autonomous agent's runtime config (tenants, ICPs, sources).
 // Config-driven so the operator changes behavior without touching code.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ICP, SourceKind } from "../packages/core/src/index.ts";
@@ -67,10 +67,28 @@ export const DEFAULT_LEARN: LearnSettings = { autoTrain: true, minExamples: 5 };
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+/** Path to the runtime overlay where self-service signups append tenants. */
+export function tenantsOverlayPath(): string {
+  return (
+    process.env.RADAR_TENANTS_FILE ??
+    resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "tenants-extra.json")
+  );
+}
+
 export function loadConfig(path?: string): AgentConfig {
   const file = path ?? process.env.RADAR_CONFIG ?? resolve(ROOT, "config/tenants.json");
   const cfg = JSON.parse(readFileSync(file, "utf8")) as AgentConfig;
-  // Normalize ICPs into full core ICP objects (inject ids).
+  // Merge self-service signups (overlay), deduped by id. Base config wins on clash.
+  const overlay = tenantsOverlayPath();
+  if (existsSync(overlay)) {
+    try {
+      const extra = JSON.parse(readFileSync(overlay, "utf8")) as TenantDef[];
+      const have = new Set(cfg.tenants.map((t) => t.id));
+      for (const t of extra) if (!have.has(t.id)) cfg.tenants.push(t);
+    } catch {
+      /* malformed overlay is ignored, never crashes a cycle */
+    }
+  }
   return cfg;
 }
 

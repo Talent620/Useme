@@ -10,6 +10,7 @@
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
 import { runSend, runTrain } from "./actions.ts";
+import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
 import { Store } from "./store.ts";
@@ -93,6 +94,37 @@ async function main() {
       console.log(ok ? col(`✓ ${leadId} -> ${status}`, C.g) : col(`Brak leada ${leadId}`, C.r));
       break;
     }
+    case "onboard": {
+      const f = parseFlags(args);
+      if (!f.email || !f.headline) {
+        console.log(col('Użycie: onboard --name "Jan" --email jan@x.pl --headline "Robię strony WordPress i SEO" [--min 500] [--max 50000] [--register]', C.y));
+        return;
+      }
+      const profile = {
+        name: f.name ?? f.email, email: f.email, headline: f.headline,
+        minBudget: f.min ? Number(f.min) : undefined, maxBudget: f.max ? Number(f.max) : undefined,
+      };
+      const tenant = buildTenant(profile);
+      console.log(col(`\n  Auto-profil dla ${tenant.name} [${tenant.plan}]`, C.b));
+      console.log(`  Rola:        ${tenant.sender.role}`);
+      console.log(`  Kategorie:   ${tenant.icp.categories.join(", ")}`);
+      console.log(`  Słowa klucz: ${tenant.icp.keywords.join(", ")}`);
+      const { leads } = await previewForProfile(profile);
+      console.log(col(`\n  Proof-of-value — leady, które dostałbyś teraz (${leads.length}):`, C.b));
+      for (const l of leads) {
+        const sc = l.score >= 70 ? C.g : C.y;
+        console.log(`    ${col(`[${l.score}]`, sc)} ${l.title}`);
+      }
+      if (f.register !== undefined) {
+        const r = registerTenant(tenant);
+        console.log(r.added ? col(`\n✓ Zarejestrowano ${tenant.id} — kolejne cykle będą go obsługiwać (tenantów: ${r.total})`, C.g)
+                            : col(`\n• ${tenant.id} już istnieje`, C.dim));
+      } else {
+        console.log(col("\n  Dodaj --register aby zapisać i włączyć stały monitoring.", C.dim));
+      }
+      console.log();
+      break;
+    }
     case "train": {
       const cfg = loadConfig();
       const learn = cfg.settings.learn ?? DEFAULT_LEARN;
@@ -163,13 +195,33 @@ async function main() {
   reject <id>          pomiń lead w outreachu
   send                 wyślij zaakceptowane (limit dzienny z configu)
   mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)
-  train                naucz modele scoringu z wyników (WON/LOST)`);
+  train                naucz modele scoringu z wyników (WON/LOST)
+  onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]`);
   }
 }
 
 function fail(msg: string) {
   console.error(col(msg, C.r));
   process.exitCode = 1;
+}
+
+/** Parse `--key value` and boolean `--flag` args into a record. */
+function parseFlags(args: string[]): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a && a.startsWith("--")) {
+      const key = a.slice(2);
+      const next = args[i + 1];
+      if (next && !next.startsWith("--")) {
+        out[key] = next;
+        i++;
+      } else {
+        out[key] = "";
+      }
+    }
+  }
+  return out;
 }
 
 main().catch((e) => {

@@ -6,6 +6,7 @@ import { loadConfig } from "../config.ts";
 import { runSend, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
+import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
 import { Store } from "../store.ts";
 
 export interface ToolDef {
@@ -36,6 +37,21 @@ export const TOOLS: ToolDef[] = [
   },
   { name: "radar_train", description: "Przelicz modele scoringu z wyników WON/LOST.", inputSchema: obj() },
   { name: "radar_run_cycle", description: "Uruchom jeden pełny cykl: crawl→enrich→score→draft→dostawa.", inputSchema: obj() },
+  {
+    name: "radar_onboard",
+    description: "Samoobsługowy onboarding: z opisu freelancera buduje ICP + profil i pokazuje proof-of-value (leady teraz). register=true zapisuje go do stałego monitoringu.",
+    inputSchema: obj(
+      {
+        name: { type: "string" },
+        email: { type: "string" },
+        headline: { type: "string", description: "Opis: co robi, umiejętności, usługi" },
+        minBudget: { type: "number" },
+        maxBudget: { type: "number" },
+        register: { type: "boolean" },
+      },
+      ["email", "headline"],
+    ),
+  },
 ];
 
 export interface ToolResult {
@@ -113,6 +129,29 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
     case "radar_run_cycle": {
       const m = await runCycle(store, cfg, Date.now());
       return { text: JSON.stringify({ newSignals: m.newSignals, leads: m.leadsCreated, queuedForOutreach: m.queuedForOutreach, digests: m.digests.length, ms: m.durationMs }, null, 2) };
+    }
+
+    case "radar_onboard": {
+      const email = arg<string>(args, "email");
+      const headline = arg<string>(args, "headline");
+      if (!email || !headline) return { text: "email i headline są wymagane", isError: true };
+      const profile = {
+        name: arg<string>(args, "name") ?? email,
+        email,
+        headline,
+        minBudget: arg<number>(args, "minBudget"),
+        maxBudget: arg<number>(args, "maxBudget"),
+      };
+      const { tenant, leads } = await previewForProfile(profile, cfg);
+      let registered = false;
+      if (arg<boolean>(args, "register")) registered = registerTenant(buildTenant(profile)).added;
+      return {
+        text: JSON.stringify({
+          tenant: { id: tenant.id, role: tenant.sender.role, plan: tenant.plan, categories: tenant.icp.categories, keywords: tenant.icp.keywords },
+          proofOfValue: leads.map((l) => ({ score: l.score, title: l.title, draftSubject: l.draftSubject })),
+          registered,
+        }, null, 2),
+      };
     }
 
     default:
