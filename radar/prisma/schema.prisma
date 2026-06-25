@@ -1,0 +1,142 @@
+// RadarPL data model. PostgreSQL. Multi-tenant from day one.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A customer we serve (freelancer or agency). Also used for ourselves
+/// (dogfooding: Radar finds its own customers via a self-targeting ICP).
+model Tenant {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  plan        Plan     @default(TRIAL)
+  status      TenantStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  icps        Icp[]
+  leads       Lead[]
+  deliveries  Delivery[]
+  subscription Subscription?
+}
+
+enum Plan {
+  TRIAL
+  STARTER   // 1 ICP, daily digest
+  PRO       // 3 ICPs, instant + auto-draft
+  AGENCY    // 10 ICPs, API + webhooks
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+  CHURNED
+}
+
+/// Ideal Customer Profile — the matching rules per tenant.
+model Icp {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  keywords        String[]
+  excludeKeywords String[]
+  categories      String[]
+  langs           String[]
+  minBudget       Int?
+  maxBudget       Int?
+  sourceWeights   Json?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  leads           Lead[]
+
+  @@index([tenantId, active])
+}
+
+/// A normalized, deduplicated public demand signal.
+model Signal {
+  id          String   @id @default(cuid())
+  source      String   // SourceKind
+  sourceName  String
+  url         String
+  title       String
+  body        String
+  lang        String
+  budget      Int?
+  categories  String[]
+  publishedAt DateTime
+  fetchedAt   DateTime @default(now())
+  dedupeKey   String   @unique
+  raw         Json?
+  leads       Lead[]
+
+  @@index([source, publishedAt])
+  @@index([fetchedAt])
+}
+
+/// A scored match between a Signal and a tenant's ICP.
+model Lead {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  icpId           String
+  icp             Icp      @relation(fields: [icpId], references: [id], onDelete: Cascade)
+  signalId        String
+  signal          Signal   @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  score           Int
+  reasons         String[]
+  matchedKeywords String[]
+  draftSubject    String?
+  draftBody       String?
+  status          LeadStatus @default(NEW)
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, signalId, icpId])
+  @@index([tenantId, status, score])
+}
+
+enum LeadStatus {
+  NEW
+  SENT       // outreach delivered
+  REPLIED
+  WON
+  REJECTED
+}
+
+/// Outbound delivery log (email/Slack/webhook) for auditability + dedupe.
+model Delivery {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel   String   // email | slack | webhook
+  leadIds   String[]
+  payload   Json
+  status    String   @default("queued")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  tenantId             String   @unique
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  plan                 Plan
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime @default(now())
+}
+
+/// Source crawl bookkeeping: cursors, last-seen, rate-limit state.
+model SourceState {
+  id         String   @id @default(cuid())
+  sourceName String   @unique
+  cursor     String?
+  lastRunAt  DateTime?
+  lastError  String?
+  healthy    Boolean  @default(true)
+}

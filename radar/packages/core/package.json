@@ -1,0 +1,17 @@
+{
+  "name": "@radar/core",
+  "version": "0.1.0",
+  "description": "Pure domain logic for the demand-signal engine: scoring, dedup, ICP matching, proposal drafting.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

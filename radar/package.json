@@ -1,0 +1,24 @@
+{
+  "name": "radar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RadarPL — silnik sygnałów popytu z publicznych danych (lead-gen as a service, sterowany AI).",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "test:core": "pnpm --filter @radar/core test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "dev": "docker compose up -d && pnpm --filter @radar/web dev",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0",
+    "typescript": "^5.6.0"
+  }
+}

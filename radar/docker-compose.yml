@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+      POSTGRES_DB: radar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  # Visual workflow layer: schedules crawls, fan-out to channels (email/Slack),
+  # human-in-the-loop approvals. Talks to the web API + Redis queue.
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      N8N_PORT: 5678
+      GENERIC_TIMEZONE: Europe/Warsaw
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:-changeme}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8ndata:/home/node/.n8n
+    depends_on:
+      - redis
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      DATABASE_URL: postgres://radar:radar@postgres:5432/radar
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgres://radar:radar@postgres:5432/radar
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  pgdata:
+  redisdata:
+  n8ndata:

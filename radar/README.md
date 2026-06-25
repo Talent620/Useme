@@ -1,0 +1,54 @@
+# RadarPL 🛰️
+
+**Silnik sygnałów popytu z publicznych danych.** Z job-boardów, przetargów,
+rejestrów firm i finansowań wykrywa, kto *właśnie teraz* potrzebuje usługi,
+ocenia intencję zakupową 0–100 względem Twojego profilu (ICP) i dostarcza
+gotowego leada z draftem pierwszej wiadomości.
+
+Produkt **i** kanał sprzedaży w jednym: ten sam silnik znajduje klientów dla
+klientów oraz dla siebie (self-targeting → CAC ≈ 0).
+
+> Pełna strategia: [`../STRATEGY.md`](../STRATEGY.md) ·
+> Architektura: [`../ARCHITECTURE.md`](../ARCHITECTURE.md)
+
+## Status
+
+| Warstwa | Stan |
+|---|---|
+| `@radar/core` (scoring, dedup, match, draft) | ✅ działa, 12 testów |
+| `@radar/worker` (ingest RSS→enrich→score) | ✅ pipeline + 2 testy |
+| Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
+| Live crawl + delivery + billing | 🚧 następny krok |
+
+## Szybki start
+
+```bash
+# 1) Testy rdzenia — bez instalacji (Node 22 uruchamia .ts natywnie)
+cd packages/core && node --test
+cd ../../apps/worker && node --test
+
+# 2) Pełny stack
+cp .env.example .env          # uzupełnij OPENAI_API_KEY itd.
+docker compose up -d          # postgres, redis, n8n
+pnpm install
+pnpm db:migrate
+pnpm --filter @radar/web dev  # http://localhost:3000
+```
+
+## Architektura w 1 zdaniu
+
+`Publiczne źródła → crawl (rate-limit/robots) → normalizacja+dedupe → enrich (AI) →
+scoring (czysta funkcja, testowana) → leady w Postgres → digest/alert/outreach przez n8n`.
+
+## Dlaczego to się obroni
+
+- **Efekt danych:** akumulacja sygnałów + etykiet WON/LOST → scoring poprawia się z czasem.
+- **Koszt integracji źródeł:** każdy adapter to bariera dla naśladowców.
+- **Flywheel podaży leadów:** nadwyżkowe leady krążą między tenantami.
+- **Wejście wertykalne:** najpierw nisza (PL freelancerzy WP/SEO), potem ekspansja.
+
+## Etyka i zgodność
+
+Tylko publiczne dane, respekt `robots.txt`/ToS, własny `User-Agent`, rate-limit,
+preferencja oficjalnych feedów/API. Sygnały to oferty/zapytania biznesowe, nie
+profile osób. RODO: minimalizacja danych, kasowanie kaskadowe po tenancie.
