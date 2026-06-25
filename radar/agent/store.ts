@@ -9,6 +9,15 @@ import type { LabeledExample, Lead, LearnedModel, Signal } from "../packages/cor
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
 
+/** Per-source crawl bookkeeping: health + conditional-GET validators. */
+export interface SourceState {
+  lastRunAt?: string;
+  lastError?: string;
+  healthy: boolean;
+  etag?: string;
+  lastModified?: string;
+}
+
 export interface StoredLead extends Lead {
   id: string;
   signalTitle: string;
@@ -30,7 +39,7 @@ interface Db {
   deliveries: { id: string; tenantId: string; leadIds: string[]; channel: string; at: string }[];
   sends: { tenantId: string; leadId: string; via: string; at: string }[];
   learned: Record<string, LearnedModel>;
-  sourceState: Record<string, { lastRunAt?: string; lastError?: string; healthy: boolean }>;
+  sourceState: Record<string, SourceState>;
 }
 
 const EMPTY: Db = { seq: 0, seenSignals: {}, leads: [], deliveries: [], sends: [], learned: {}, sourceState: {} };
@@ -187,8 +196,12 @@ export class Store {
     this.db.learned[tenantId] = model;
   }
 
-  setSourceState(name: string, state: { lastRunAt?: string; lastError?: string; healthy: boolean }) {
+  setSourceState(name: string, state: SourceState) {
     this.db.sourceState[name] = state;
+  }
+
+  getSourceState(name: string): SourceState | undefined {
+    return this.db.sourceState[name];
   }
 
   stats() {

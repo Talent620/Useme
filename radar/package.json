@@ -12,7 +12,7 @@
   "scripts": {
     "test": "pnpm -r --if-present test",
     "test:core": "pnpm --filter @radar/core test",
-    "test:agent": "node --test agent/test/cycle.test.ts agent/test/outreach.test.ts agent/test/learn.test.ts",
+    "test:agent": "node --test agent/test/cycle.test.ts agent/test/outreach.test.ts agent/test/learn.test.ts agent/test/crawl.test.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "dev": "docker compose up -d && pnpm --filter @radar/web dev",
     "db:migrate": "prisma migrate dev",

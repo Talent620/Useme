@@ -17,7 +17,9 @@
   "sources": [
     { "name": "sample", "kind": "job_board", "feed": "file:./config/sample-feed.xml", "enabled": true },
     { "name": "useme", "kind": "job_board", "feed": "https://useme.com/pl/jobs/feed/", "enabled": false },
-    { "name": "ted-eu", "kind": "tender", "feed": "https://ted.europa.eu/en/rss", "enabled": false }
+    { "name": "useme-en", "kind": "job_board", "feed": "https://useme.com/en/jobs/feed/", "enabled": false },
+    { "name": "ted-eu", "kind": "tender", "feed": "https://ted.europa.eu/en/rss", "enabled": false },
+    { "name": "rss-generic", "kind": "rss", "feed": "https://example.com/feed.xml", "enabled": false }
   ],
   "tenants": [
     {

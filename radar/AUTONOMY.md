@@ -101,6 +101,14 @@ node agent/cli.ts draft <leadId>     # gotowy draft do skopiowania
 node agent/cli.ts mark <leadId> WON  # sprzężenie zwrotne (uczy scoring w fazie 2)
 ```
 
+## Realne źródła (grzeczny crawl)
+Włączasz feed w `config/tenants.json` (`enabled: true`). Live fetch jest dobrym obywatelem:
+- **robots.txt** — przed pobraniem sprawdzamy, czy nasz UA ma wstęp (wyłącznik awaryjny `CRAWL_IGNORE_ROBOTS=1`, używaj świadomie).
+- **rate-limit per host** — min. odstęp `CRAWL_MIN_DELAY_MS` (domyślnie 1500 ms).
+- **warunkowy GET** — ETag/Last-Modified zapisywane w SourceState; niezmieniony feed zwraca 304 i nic nie kosztuje.
+- **własny User-Agent** `CRAWL_USER_AGENT`, timeouty, preferencja oficjalnych feedów/API.
+> Przed włączeniem źródła sprawdź jego ToS. Domyślnie aktywny jest tylko `sample` (fixture).
+
 ## Konfiguracja (jedyne, co robisz ręcznie)
 `config/tenants.json`:
 - **sources** — co crawlować (`file:` = fixture/test, `http(s)://` = realny feed; włącz `enabled: true`).

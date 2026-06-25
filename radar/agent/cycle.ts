@@ -35,10 +35,20 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
   const collected: Signal[] = [];
   let queuedForOutreach = 0;
 
-  // 1) Crawl + normalize every enabled source.
+  // 1) Crawl + normalize every enabled source (conditional GET via SourceState).
   for (const src of cfg.sources.filter((s) => s.enabled)) {
     try {
-      const listings = await fetchListings(resolveFeed(src.feed));
+      const prevState = store.getSourceState(src.name);
+      const result = await fetchListings(resolveFeed(src.feed), {
+        etag: prevState?.etag,
+        lastModified: prevState?.lastModified,
+      });
+      if (result.notModified) {
+        sourcesMeta.push({ name: src.name, raw: 0, ok: true });
+        store.setSourceState(src.name, { ...prevState, lastRunAt: startedAt, healthy: true });
+        continue;
+      }
+      const listings = result.listings;
       for (const raw of listings) {
         const e = await enrich(raw.title, raw.body);
         const sig = toSignal(
@@ -53,7 +63,12 @@ export async function runCycle(store: Store, cfg: AgentConfig, now: number): Pro
         collected.push(sig);
       }
       sourcesMeta.push({ name: src.name, raw: listings.length, ok: true });
-      store.setSourceState(src.name, { lastRunAt: startedAt, healthy: true });
+      store.setSourceState(src.name, {
+        lastRunAt: startedAt,
+        healthy: true,
+        etag: result.etag,
+        lastModified: result.lastModified,
+      });
     } catch (err) {
       const error = (err as Error).message;
       sourcesMeta.push({ name: src.name, raw: 0, ok: false, error });
