@@ -11,6 +11,8 @@
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
 import { runExecute, runQualityTrain, runSend, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
+import { VERSION } from "./version.ts";
+import { applyStagedUpdate, checkAndStage } from "./updater.ts";
 import { runCycle } from "./cycle.ts";
 import { loop, storePath } from "./daemon.ts";
 import { Store } from "./store.ts";
@@ -21,9 +23,27 @@ const col = (s: string, c: string) => (tty ? `${c}${s}${C.x}` : s);
 
 async function main() {
   const [cmd, ...args] = process.argv.slice(2);
+  // Apply a self-update staged by a previous run (cron/manual) before anything.
+  if (applyStagedUpdate().applied) console.error(col("✓ zastosowano automatyczną aktualizację", C.g));
   const store = new Store(storePath());
 
   switch (cmd) {
+    case "version":
+      console.log(`RadarPL ${VERSION}`);
+      break;
+    case "update": {
+      console.log(col("Sprawdzam aktualizacje...", C.dim));
+      const r = await checkAndStage(undefined, true);
+      if (r.status === "staged") {
+        const a = applyStagedUpdate();
+        console.log(a.applied ? col(`✓ Zaktualizowano ${r.current} → ${r.latest}`, C.g) : col(`Pobrano ${r.latest}, zostanie wdrożone przy następnym starcie`, C.y));
+      } else if (r.status === "up-to-date") {
+        console.log(col(`✓ Masz najnowszą wersję (${r.current})`, C.g));
+      } else {
+        console.log(col(`Aktualizacja: ${r.status}${r.latest ? " (najnowsza: " + r.latest + ")" : ""}`, C.y));
+      }
+      break;
+    }
     case "once": {
       const m = await runCycle(store, loadConfig(), Date.now());
       console.log(col("✓ Cykl zakończony", C.g));
@@ -238,7 +258,9 @@ async function main() {
   mark-exec <id> <O>   oceń wykonanie (ACCEPTED/REVISION/REJECTED)
   quality              model jakości wykonania (samokalibracja bramki)
   train                naucz modele scoringu z wyników (WON/LOST)
-  onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]`);
+  onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]
+  version              pokaż wersję
+  update               sprawdź i zainstaluj aktualizację (auto co release w daemonie)`);
   }
 }
 

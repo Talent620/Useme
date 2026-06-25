@@ -1,7 +1,7 @@
 // Loads the autonomous agent's runtime config (tenants, ICPs, sources).
 // Config-driven so the operator changes behavior without touching code.
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ICP, SourceKind } from "../packages/core/src/index.ts";
@@ -94,8 +94,46 @@ export function tenantsOverlayPath(): string {
   );
 }
 
+/** Minimal working config written on first run of a standalone binary. */
+export const DEFAULT_CONFIG: AgentConfig = {
+  settings: {
+    intervalMinutes: 30,
+    threshold: 45,
+    maxLeadsPerDigest: 15,
+    outreach: { enabled: true, threshold: 75, autoApprove: false, dailyCapPerTenant: 20 },
+    learn: { autoTrain: true, minExamples: 5 },
+    execution: { enabled: true, autoExecuteOnWon: true, maxIterations: 3, minConfidence: 80 },
+  },
+  sources: [{ name: "useme", kind: "job_board", feed: "https://useme.com/pl/jobs/feed/", enabled: false }],
+  tenants: [
+    {
+      id: "self",
+      name: "RadarPL",
+      email: "you@example.com",
+      channel: "file",
+      plan: "STARTER",
+      sender: { name: "Twoje Imię", role: "freelancer", proofPoints: ["uzupełnij profil"] },
+      icp: { name: "Twój ICP", keywords: ["uzupełnij"], excludeKeywords: ["wolontariat", "za darmo"], categories: ["web"], langs: ["pl"], minBudget: 300, maxBudget: 100000 },
+    },
+  ],
+};
+
+/** Resolve the config file, bootstrapping a default one if none exists. */
+function resolveConfigFile(path?: string): string {
+  if (path) return path;
+  if (process.env.RADAR_CONFIG) return process.env.RADAR_CONFIG;
+  const rootCfg = resolve(ROOT, "config/tenants.json");
+  if (existsSync(rootCfg)) return rootCfg;
+  const cwdCfg = resolve(process.cwd(), "config/tenants.json");
+  if (existsSync(cwdCfg)) return cwdCfg;
+  // First run of a standalone binary: write an editable default next to CWD.
+  mkdirSync(resolve(process.cwd(), "config"), { recursive: true });
+  writeFileSync(cwdCfg, JSON.stringify(DEFAULT_CONFIG, null, 2));
+  return cwdCfg;
+}
+
 export function loadConfig(path?: string): AgentConfig {
-  const file = path ?? process.env.RADAR_CONFIG ?? resolve(ROOT, "config/tenants.json");
+  const file = resolveConfigFile(path);
   const cfg = JSON.parse(readFileSync(file, "utf8")) as AgentConfig;
   // Merge self-service signups (overlay), deduped by id. Base config wins on clash.
   const overlay = tenantsOverlayPath();

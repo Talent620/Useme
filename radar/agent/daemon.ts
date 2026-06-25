@@ -6,6 +6,11 @@ import { resolve } from "node:path";
 import { loadConfig, ROOT } from "./config.ts";
 import { runCycle } from "./cycle.ts";
 import { Store } from "./store.ts";
+import { applyStagedUpdate, checkAndStage, shouldCheck, touchMarker } from "./updater.ts";
+
+export function updateMarkerPath(): string {
+  return resolve(process.env.RADAR_DATA_DIR ?? resolve(ROOT, "data"), "update-check");
+}
 
 function log(obj: Record<string, unknown>) {
   console.log(JSON.stringify({ ts: new Date().toISOString(), ...obj }));
@@ -28,10 +33,19 @@ export async function loop(): Promise<void> {
   process.on("SIGINT", () => stop("SIGINT"));
   process.on("SIGTERM", () => stop("SIGTERM"));
 
+  // Apply any update staged by a previous run before doing work.
+  if (applyStagedUpdate().applied) log({ level: "info", msg: "applied staged self-update" });
+
   log({ level: "info", msg: "daemon started", intervalMin: cfg.settings.intervalMinutes, tenants: cfg.tenants.length });
 
   while (running) {
     try {
+      // Self-update: check at most once/day, stage for next restart.
+      if (process.env.RADAR_NO_UPDATE !== "1" && shouldCheck(updateMarkerPath(), Date.now())) {
+        touchMarker(updateMarkerPath());
+        const u = await checkAndStage();
+        if (u.status === "staged") log({ level: "info", msg: "self-update staged", from: u.current, to: u.latest });
+      }
       const m = await runCycle(store, loadConfig(), Date.now());
       log({ level: "info", msg: "cycle done", newSignals: m.newSignals, leads: m.leadsCreated, digests: m.digests.length, ms: m.durationMs });
     } catch (err) {

@@ -24,7 +24,9 @@
     "agent:status": "node agent/cli.ts status",
     "agent:leads": "node agent/cli.ts leads",
     "test:mcp": "node --test agent/mcp/test/mcp.test.ts",
-    "mcp": "node agent/mcp/server.ts"
+    "mcp": "node agent/mcp/server.ts",
+    "build:bin": "bash scripts/build-bin.sh",
+    "test:updater": "node --test agent/test/updater.test.ts"
   },
   "devDependencies": {
     "prisma": "^5.20.0",

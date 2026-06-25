@@ -1,5 +1,8 @@
 # RadarPL 🛰️
 
+> **Binarki do pobrania (Windows `.exe` + Ubuntu) z auto-aktualizacją:** [INSTALL.md](./INSTALL.md) · [Releases](https://github.com/talent620/useme/releases/latest)
+
+
 **Silnik sygnałów popytu z publicznych danych.** Z job-boardów, przetargów,
 rejestrów firm i finansowań wykrywa, kto *właśnie teraz* potrzebuje usługi,
 ocenia intencję zakupową 0–100 względem Twojego profilu (ICP) i dostarcza
