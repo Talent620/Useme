@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runNegotiate, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { recordToMemory, runAttest, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runNegotiate, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain, runVerifyAttestation } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -308,6 +308,29 @@ async function main() {
       console.log();
       break;
     }
+    case "attest": {
+      const r = await runAttest(store, args[0] ?? "");
+      if ("error" in r) return fail(r.error);
+      const oc = r.outcome === "pass" ? C.g : C.r;
+      console.log(col(`\n  Proof-of-Outcome dla ${r.leadId}\n`, C.b));
+      console.log(`  Werdykt:      ${col(r.outcome.toUpperCase(), oc)}`);
+      console.log(`  artifactHash: ${col(r.attestation.artifactHash.slice(0, 16) + "…", C.dim)}`);
+      console.log(`  specHash:     ${col(r.attestation.specHash.slice(0, 16) + "…", C.dim)}`);
+      console.log(`  resultHash:   ${col(r.attestation.resultHash.slice(0, 16) + "…", C.dim)}`);
+      console.log(col(`  Każdy z tym plikiem i specyfikacją może niezależnie zweryfikować: verify ${r.leadId}`, C.dim));
+      console.log();
+      break;
+    }
+    case "verify": {
+      const r = await runVerifyAttestation(store, args[0] ?? "");
+      if ("error" in r) return fail(r.error);
+      const oc = r.ok ? C.g : C.r;
+      console.log(col(`\n  Weryfikacja atestacji ${r.leadId} (re-egzekucja)\n`, C.b));
+      console.log(`  Wynik:        ${col(r.ok ? "✓ POTWIERDZONA" : "✗ NIEZGODNA", oc)}`);
+      console.log(`  artifact:     ${r.artifactMatch ? col("✓", C.g) : col("✗ zmieniony", C.r)}  ·  spec: ${r.specMatch ? col("✓", C.g) : col("✗ dryf", C.r)}  ·  result: ${r.resultMatch ? col("✓", C.g) : col("✗", C.r)}  ·  podpis: ${r.signatureValid ? col("✓", C.g) : col("✗", C.r)}`);
+      console.log();
+      break;
+    }
     case "negotiate": {
       const leadId = args[0] ?? "";
       const offer = Number(args[1]);
@@ -439,6 +462,8 @@ async function main() {
   price <leadId>       rekomendowana cena + P(wygranej) + wartość oczekiwana
   price-train          skalibruj wagi modelu cenowego z historii win/loss (auto co cykl)
   negotiate <id> <kwota>  doradca kontroferty (accept/counter/decline, EV + próg)
+  attest <leadId>      wygeneruj replayowalny dowód wykonania (Proof-of-Outcome)
+  verify <leadId>      niezależnie zweryfikuj atestację przez re-egzekucję
   report               panel operatora: pełny stan + co trzeba zrobić
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]

@@ -9,6 +9,7 @@ import type { ExecOutcome, QualityModel, QualitySample } from "./exec/quality.ts
 import type { LeadFact } from "./strategy.ts";
 import { rank, update as rankUpdate, type RankTable } from "./rank.ts";
 import type { PriceWeights } from "./pricing.ts";
+import type { Attestation } from "./attest.ts";
 
 /** Outreach lifecycle, separate from the sales outcome in `status`. */
 export type OutreachStatus = "none" | "queued" | "approved" | "sent" | "skipped";
@@ -51,6 +52,8 @@ export interface StoredLead extends Lead {
   executionCapability?: string;
   executionOutcome?: ExecOutcome; // client verdict on the deliverable
   deliverableRef?: string;
+  // Proof-of-Outcome: independently replayable attestation of the deliverable.
+  attestation?: Attestation;
 }
 
 interface Db {
@@ -214,6 +217,14 @@ export class Store {
       l.deliverableRef = ref;
       if (capability) l.executionCapability = capability;
     }
+  }
+
+  /** Attach a Proof-of-Outcome attestation to a lead's deliverable. */
+  recordAttestation(leadId: string, att: Attestation): boolean {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (!l) return false;
+    l.attestation = att;
+    return true;
   }
 
   /** Record the client's verdict on a delivered job — fuel for quality learning. */

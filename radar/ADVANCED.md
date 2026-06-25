@@ -53,6 +53,23 @@ Pełne sprzężenie zwrotne, w pełni autonomiczne:
   `agent/test/pricing-calibrate.test.ts` (nauka elastyczności, determinizm,
   persystencja wag, próbki z pamięci).
 
+## `attest.ts` — Proof-of-Outcome (weryfikacja przez re-egzekucję)
+Prymityw zaufania: **nie ufaj wynikowi, ufaj determinizmowi.** Atestacja zapisuje
+hash trójki `(artifact, spec, result)` + werdykt pass/fail. Każdy może **`replay`** —
+ponownie uruchomić tę samą (czystą) specyfikację na tym samym artefakcie — i
+potwierdzić ten sam `resultHash`, bez zaufania do wykonawcy i bez centralnego
+autorytetu. Podpis (Ed25519) jest opcjonalny — dowodem jest re-egzekucja, nie podpis.
+- `canonicalize`/`canonicalHash` (głęboka, stabilna serializacja — naprawia płytki
+  sort z pierwotnego szkicu), `attest(artifact, spec, opts)`, `replay(att, artifact, spec)`
+  → `{ok, artifactMatch, specMatch, resultMatch, signatureValid}`,
+  `generateKeyPair`/`signAttestation`/`verifyAttestation`.
+- Integracja: `runAttest`/`runVerifyAttestation` (akcje), `deliverableSpecV1`
+  (deterministyczna, bez LLM), pole `StoredLead.attestation`. Klient może
+  **zweryfikować** dostarczoną pracę, nie tylko jej zaufać. Wykrywa manipulację
+  pracą i podmianę dowodu. Testy: `agent/test/attest.test.ts` (determinizm,
+  tamper-detection end-to-end, podpisy, dryf specyfikacji). Tylko `node:crypto`,
+  bez kluczy działa.
+
 ## `negotiate.ts` — silnik negocjacji (doradca kontroferty)
 Dla kontroferty klienta zwraca decyzję **accept / counter / decline**
 maksymalizującą wartość oczekiwaną, nigdy nie schodząc poniżej progu marży.
@@ -91,11 +108,13 @@ istniejącymi silnikami.
 
 ## Sterowanie
 - CLI: `board`, `finance`, `crm`, `rank`, `price <leadId>`, `price-train`,
-  `negotiate <id> <kwota>` (+ `mark` karmi pamięć i bandita).
+  `negotiate <id> <kwota>`, `attest <leadId>`, `verify <leadId>`
+  (+ `mark` karmi pamięć i bandita).
 - MCP: `radar_board`, `radar_finance`, `radar_crm`, `radar_rank`, `radar_price`,
-  `radar_price_train`, `radar_negotiate` (łącznie 25 narzędzi).
+  `radar_price_train`, `radar_negotiate`, `radar_attest`, `radar_verify`
+  (łącznie 27 narzędzi).
 - Akcje współdzielone: `runBoard`, `runFinance`, `runCrm`, `runRank`, `runPrice`,
-  `runPriceTrain`, `runNegotiate`, `recordToMemory`.
+  `runPriceTrain`, `runNegotiate`, `runAttest`, `runVerifyAttestation`, `recordToMemory`.
 
 ## Zasady projektowe (utrzymane)
 Pełna kompatybilność wsteczna · zero atrap/TODO · każda funkcja z testami

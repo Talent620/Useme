@@ -23,7 +23,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **`agent/` — autonomiczny cykl (crawl→score→draft→dostawa)** | ✅ **działa end-to-end, 3 testy** |
 | **GitHub Actions cron (autonomia w chmurze)** | ✅ **`.github/workflows/radar-autonomous.yml`** |
 | **Outreach z bramką + self-improving scoring** | ✅ **27 testów** |
-| **Serwer MCP (agent-native, 25 narzędzi)** | ✅ **`agent/mcp/`, 7 testów** |
+| **Serwer MCP (agent-native, 27 narzędzi)** | ✅ **`agent/mcp/`, 7 testów** |
 | **Realne źródła: robots/rate-limit/warunkowy GET** | ✅ **7 testów** |
 | **Persystencja Postgres/Prisma (swappowalny repo)** | ✅ **3 testy + migracja** ([PERSISTENCE.md](./PERSISTENCE.md)) |
 | **Billing Stripe + plany (limity w runtime)** | ✅ **9 testów** ([BILLING.md](./BILLING.md)) |
@@ -43,6 +43,7 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 | **Zamknięta pętla decyzji: cykl wycenia → wynik uczy bandita (rank/price)** | ✅ **5 testów** (`closure.test.ts`, ceny na każdym leadzie, RL-lite z realnych WON/LOST) |
 | **Samokalibracja cen: model uczy się elastyczności cenowej z win/loss** | ✅ **5 testów** (`pricing-calibrate.test.ts`, regresja logistyczna, 3. pętla uczenia, auto co cykl) |
 | **Silnik negocjacji: accept/counter/decline z EV + progiem marży** | ✅ **9 testów** (`negotiate.test.ts`, ustępstwa po rundach, walk-away, deterministyczny) |
+| **Proof-of-Outcome: weryfikacja pracy przez re-egzekucję (klient sprawdza, nie ufa)** | ✅ **10 testów** (`attest.test.ts`, tamper-detection, podpisy Ed25519, tylko `node:crypto`) |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
 | Live crawl + płatne plany | 🚧 włącz źródła + sekrety Stripe |
 

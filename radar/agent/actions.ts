@@ -9,6 +9,7 @@ import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, R
 import { computeFunnel, recommend, DEFAULT_COSTS, type Funnel, type Recommendation } from "./strategy.ts";
 import { recommendBid, competitionScore, calibrateWeights, DEFAULT_WEIGHTS, type CalibrationResult, type PriceWeights } from "./pricing.ts";
 import { negotiate, type NegotiationDecision } from "./negotiate.ts";
+import { attest, replay, type Attestation, type ReplayResult } from "./attest.ts";
 import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
 import { buildReport } from "./report.ts";
 import { memoryPath } from "./config.ts";
@@ -308,6 +309,63 @@ export function runNegotiate(store: Store, leadId: string, clientOffer: number):
   }
   store.save();
   return { ...decision, leadId, round, ourPrice, clientOffer };
+}
+
+/**
+ * Deterministic acceptance spec for a deliverable (Proof-of-Outcome, v1).
+ * PURE function of the content string — no clock, no network — so any third
+ * party can replay it. Versioned: changing it changes its hash, which `replay`
+ * detects as spec drift. Intentionally simple, structural, and LLM-free.
+ */
+export function deliverableSpecV1(content: string): { pass: boolean; checks: Record<string, boolean> } {
+  const text = content ?? "";
+  const fences = text.match(/```/g)?.length ?? 0;
+  const checks = {
+    nonEmpty: text.trim().length >= 200,
+    hasHeading: /(^|\n)#{1,3}\s/.test(text) || /<h[1-3][\s>]/i.test(text),
+    balancedCodeFences: fences % 2 === 0,
+    noPlaceholders: !/\b(TODO|FIXME|TBD|lorem ipsum)\b/i.test(text),
+  };
+  return { pass: Object.values(checks).every(Boolean), checks };
+}
+
+export interface AttestResult {
+  leadId: string;
+  attestation: Attestation;
+  outcome: "pass" | "fail";
+}
+
+/**
+ * Produce a replayable Proof-of-Outcome for a lead's deliverable: read the
+ * delivered file, run the deterministic spec, attest the (artifact, spec,
+ * result) hash triple, and persist it on the lead. Anyone with the same file
+ * and the (open-source) spec can independently confirm it via runVerifyAttestation.
+ */
+export async function runAttest(store: Store, leadId: string, at?: number): Promise<AttestResult | { error: string }> {
+  const lead = store.findLead(leadId);
+  if (!lead) return { error: `Brak leada ${leadId}` };
+  if (!lead.deliverableRef || !existsSync(lead.deliverableRef)) return { error: "Brak pliku deliverable (najpierw: execute/work)" };
+  const content = readFileSync(lead.deliverableRef, "utf8");
+  const attestation = await attest(content, deliverableSpecV1, { at });
+  store.recordAttestation(leadId, attestation);
+  store.save();
+  return { leadId, attestation, outcome: attestation.outcome };
+}
+
+export interface VerifyResult extends ReplayResult {
+  leadId: string;
+}
+
+/** Independently re-verify a lead's attestation by replaying the spec over the
+ * current deliverable file. Detects any tampering with the work or the proof. */
+export async function runVerifyAttestation(store: Store, leadId: string): Promise<VerifyResult | { error: string }> {
+  const lead = store.findLead(leadId);
+  if (!lead) return { error: `Brak leada ${leadId}` };
+  if (!lead.attestation) return { error: "Brak atestacji (najpierw: attest)" };
+  if (!lead.deliverableRef || !existsSync(lead.deliverableRef)) return { error: "Brak pliku deliverable do weryfikacji" };
+  const content = readFileSync(lead.deliverableRef, "utf8");
+  const result = await replay(lead.attestation, content, deliverableSpecV1);
+  return { leadId, ...result };
 }
 
 /** Build the operator dashboard and persist it to data/report.md. */
