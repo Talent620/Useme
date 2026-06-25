@@ -1,7 +1,7 @@
 // GET /api/leads?tenantId=...&status=NEW&min=60
-// Returns scored leads for a tenant, highest intent first.
+// Returns scored leads for a tenant, highest intent first. Backend-agnostic.
 import { NextResponse } from "next/server";
-import { prisma } from "../../../lib/db.ts";
+import { createLeadRepo } from "../../../../../agent/repo-factory.ts";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -11,12 +11,7 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status") ?? undefined;
   const min = Number(url.searchParams.get("min") ?? "0");
 
-  const leads = await prisma.lead.findMany({
-    where: { tenantId, score: { gte: min }, ...(status ? { status: status as never } : {}) },
-    orderBy: [{ score: "desc" }, { createdAt: "desc" }],
-    take: 100,
-    include: { signal: { select: { title: true, url: true, source: true, budget: true, publishedAt: true } } },
-  });
-
+  const repo = await createLeadRepo();
+  const leads = await repo.listLeads(tenantId, { min, status, limit: 100 });
   return NextResponse.json({ count: leads.length, leads });
 }
