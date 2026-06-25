@@ -1,0 +1,73 @@
+name: RadarPL — autonomous cycle
+
+# Uruchamia agenta w chmurze, bez Twojego komputera.
+# - schedule: co 2h (cron firuje tylko z gałęzi domyślnej repo)
+# - workflow_dispatch: ręczne odpalenie z dowolnej gałęzi
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Powód ręcznego uruchomienia"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-autonomous
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RADAR_DATA_DIR: ${{ github.workspace }}/radar/data
+      RADAR_STORE: ${{ github.workspace }}/radar/data/store.json
+      # Sekrety (Settings → Secrets → Actions). Wszystkie opcjonalne:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      RADAR_WEBHOOK_URL: ${{ secrets.RADAR_WEBHOOK_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Persystencja stanu między uruchomieniami (dedup + historia leadów).
+      - name: Restore agent state
+        uses: actions/cache/restore@v4
+        with:
+          path: radar/data
+          key: radar-state-${{ github.run_id }}
+          restore-keys: |
+            radar-state-
+
+      - name: Run one autonomous cycle
+        working-directory: radar
+        run: node agent/cli.ts once
+
+      - name: Show status
+        working-directory: radar
+        run: node agent/cli.ts status
+
+      # Zapis zaktualizowanego stanu na potrzeby kolejnego uruchomienia.
+      - name: Save agent state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: radar/data
+          key: radar-state-${{ github.run_id }}
+
+      # Digesty jako artefakt do pobrania z zakładki Actions.
+      - name: Upload digests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radar-digests-${{ github.run_id }}
+          path: radar/data/digests/
+          if-no-files-found: ignore
+          retention-days: 14

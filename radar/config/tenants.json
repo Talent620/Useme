@@ -1,0 +1,78 @@
+{
+  "settings": {
+    "intervalMinutes": 30,
+    "threshold": 45,
+    "maxLeadsPerDigest": 15
+  },
+  "sources": [
+    { "name": "sample", "kind": "job_board", "feed": "file:./config/sample-feed.xml", "enabled": true },
+    { "name": "useme", "kind": "job_board", "feed": "https://useme.com/pl/jobs/feed/", "enabled": false },
+    { "name": "ted-eu", "kind": "tender", "feed": "https://ted.europa.eu/en/rss", "enabled": false }
+  ],
+  "tenants": [
+    {
+      "id": "self",
+      "name": "RadarPL (self-targeting)",
+      "email": "founder@radar.pl",
+      "channel": "file",
+      "sender": {
+        "name": "Zespół RadarPL",
+        "role": "dostawca leadów dla freelancerów",
+        "portfolioUrl": "https://radar.pl",
+        "proofPoints": ["dzienny digest dopasowanych leadów", "draft wiadomości gotowy do wysłania"]
+      },
+      "icp": {
+        "name": "Freelancerzy szukający klientów",
+        "keywords": ["freelancer", "zlecę", "szukam wykonawcy", "potrzebuję specjalisty"],
+        "excludeKeywords": ["wolontariat", "za darmo", "praca na etat"],
+        "categories": ["web", "seo", "automation", "copywriting", "graphic"],
+        "langs": ["pl"],
+        "minBudget": 300,
+        "maxBudget": 100000
+      }
+    },
+    {
+      "id": "demo-wp",
+      "name": "Jan Kowalski — WordPress dev",
+      "email": "jan@example.com",
+      "channel": "file",
+      "sender": {
+        "name": "Jan Kowalski",
+        "role": "freelancer WordPress",
+        "portfolioUrl": "https://jan.dev",
+        "signaturePhone": "+48 600 100 200",
+        "proofPoints": ["30+ wdrożeń WordPress/WooCommerce", "średni czas realizacji 5 dni"]
+      },
+      "icp": {
+        "name": "WordPress / WooCommerce",
+        "keywords": ["wordpress", "woocommerce", "elementor", "landing page", "strona internetowa"],
+        "excludeKeywords": ["wolontariat", "za darmo"],
+        "categories": ["wordpress", "web", "ecommerce"],
+        "langs": ["pl"],
+        "minBudget": 500,
+        "maxBudget": 50000
+      }
+    },
+    {
+      "id": "demo-seo",
+      "name": "Anna Nowak — SEO/SEM",
+      "email": "anna@example.com",
+      "channel": "file",
+      "sender": {
+        "name": "Anna Nowak",
+        "role": "specjalistka SEO",
+        "portfolioUrl": "https://anna-seo.pl",
+        "proofPoints": ["audyty SEO dla 50+ sklepów", "śr. wzrost ruchu 2,3x w 6 mc"]
+      },
+      "icp": {
+        "name": "SEO / pozycjonowanie",
+        "keywords": ["seo", "pozycjonowanie", "audyt seo", "google ads", "kampania"],
+        "excludeKeywords": ["wolontariat"],
+        "categories": ["seo", "ads", "ecommerce"],
+        "langs": ["pl"],
+        "minBudget": 500,
+        "maxBudget": 50000
+      }
+    }
+  ]
+}

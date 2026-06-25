@@ -43,7 +43,7 @@ export function buildProposal(signal: Signal, sender: SenderProfile): ProposalDr
     ? [
         `Dzień dobry,`,
         ``,
-        `widzę, że ${hook.toLowerCase()} Zajmuję się tym jako ${sender.role}.`,
+        `widzę Twoje ogłoszenie: „${hook}". Zajmuję się tym jako ${sender.role}.`,
         proof ? `W skrócie: ${proof}.` : ``,
         `Mogę przygotować konkretną wycenę i harmonogram w ciągu 24h.`,
         sender.portfolioUrl ? `Portfolio: ${sender.portfolioUrl}` : ``,
@@ -55,7 +55,7 @@ export function buildProposal(signal: Signal, sender: SenderProfile): ProposalDr
     : [
         `Hi,`,
         ``,
-        `I noticed that ${hook.toLowerCase()} I do exactly this as a ${sender.role}.`,
+        `I saw your post: "${hook}". I do exactly this as a ${sender.role}.`,
         proof ? `In short: ${proof}.` : ``,
         `I can send a concrete quote and timeline within 24h.`,
         sender.portfolioUrl ? `Portfolio: ${sender.portfolioUrl}` : ``,

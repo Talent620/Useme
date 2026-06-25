@@ -17,8 +17,12 @@ klientów oraz dla siebie (self-targeting → CAC ≈ 0).
 |---|---|
 | `@radar/core` (scoring, dedup, match, draft) | ✅ działa, 12 testów |
 | `@radar/worker` (ingest RSS→enrich→score) | ✅ pipeline + 2 testy |
+| **`agent/` — autonomiczny cykl (crawl→score→draft→dostawa)** | ✅ **działa end-to-end, 3 testy** |
+| **GitHub Actions cron (autonomia w chmurze)** | ✅ **`.github/workflows/radar-autonomous.yml`** |
 | Prisma schema / docker-compose / API / Dockerfile | ✅ scaffold |
-| Live crawl + delivery + billing | 🚧 następny krok |
+| Live crawl (realne feedy) + billing | 🚧 włącz źródła + sekrety |
+
+> **Tryb autonomiczny:** [`AUTONOMY.md`](./AUTONOMY.md) — agent działa za Ciebie bez Twojego komputera.
 
 ## Szybki start
 

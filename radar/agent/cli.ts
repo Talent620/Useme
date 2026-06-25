@@ -1,0 +1,101 @@
+// Control surface for the autonomous agent. Minimal commands so the operator
+// only does what truly needs a human:
+//
+//   node agent/cli.ts once         # run a single cycle now
+//   node agent/cli.ts loop         # run forever on the configured interval
+//   node agent/cli.ts status       # store stats + source health
+//   node agent/cli.ts leads [id]   # list leads (optionally for one tenant)
+//   node agent/cli.ts draft <leadId>   # print the ready-to-send draft
+//   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
+
+import { loadConfig } from "./config.ts";
+import { runCycle } from "./cycle.ts";
+import { loop, storePath } from "./daemon.ts";
+import { Store } from "./store.ts";
+
+const C = { dim: "\x1b[2m", b: "\x1b[1m", g: "\x1b[32m", y: "\x1b[33m", r: "\x1b[31m", x: "\x1b[0m" };
+const tty = process.stdout.isTTY;
+const col = (s: string, c: string) => (tty ? `${c}${s}${C.x}` : s);
+
+async function main() {
+  const [cmd, ...args] = process.argv.slice(2);
+  const store = new Store(storePath());
+
+  switch (cmd) {
+    case "once": {
+      const m = await runCycle(store, loadConfig(), Date.now());
+      console.log(col("✓ Cykl zakończony", C.g));
+      console.log(`  Źródła:        ${m.sources.map((s) => `${s.name}(${s.ok ? s.raw : "ERR"})`).join(", ")}`);
+      console.log(`  Nowe sygnały:  ${m.newSignals}`);
+      console.log(`  Nowe leady:    ${col(String(m.leadsCreated), C.b)}`);
+      console.log(`  Digesty:       ${m.digests.map((d) => `${d.tenant}:${d.leads}`).join(", ") || "—"}`);
+      console.log(col(`  Czas: ${m.durationMs} ms`, C.dim));
+      for (const d of m.digests) console.log(col(`  → ${d.ref}`, C.dim));
+      break;
+    }
+    case "loop":
+      await loop();
+      break;
+    case "status": {
+      const s = store.stats();
+      console.log(col("\n  RadarPL — status agenta\n", C.b));
+      console.log(`  Sygnałów widzianych:  ${s.signalsSeen}`);
+      console.log(`  Leadów łącznie:       ${s.leads}`);
+      console.log(`  Dostaw:               ${s.deliveries}`);
+      console.log(`  Wg statusu:           ${Object.entries(s.byStatus).map(([k, v]) => `${k}:${v}`).join(", ") || "—"}`);
+      console.log(col("\n  Zdrowie źródeł:", C.b));
+      for (const [name, st] of Object.entries(s.sources)) {
+        const mark = st.healthy ? col("●", C.g) : col("●", C.r);
+        console.log(`    ${mark} ${name}  ${col(st.lastRunAt?.slice(0, 16).replace("T", " ") ?? "—", C.dim)}${st.lastError ? col("  " + st.lastError, C.r) : ""}`);
+      }
+      console.log();
+      break;
+    }
+    case "leads": {
+      const tenantId = args[0];
+      const cfg = loadConfig();
+      const tenants = tenantId ? cfg.tenants.filter((t) => t.id === tenantId) : cfg.tenants;
+      for (const t of tenants) {
+        const leads = store.leadsForTenant(t.id).slice(0, 20);
+        console.log(col(`\n  ${t.name} (${t.id}) — ${leads.length} leadów`, C.b));
+        for (const l of leads) {
+          const sc = l.score >= 70 ? C.g : l.score >= 50 ? C.y : C.dim;
+          console.log(`    ${col(`[${l.score}]`, sc)} ${l.id}  ${l.signalTitle}  ${col(l.status, C.dim)}`);
+        }
+      }
+      console.log();
+      break;
+    }
+    case "draft": {
+      const lead = store.findLead(args[0]);
+      if (!lead) return fail(`Brak leada ${args[0]}`);
+      console.log(col(`Temat: ${lead.draftSubject}`, C.b));
+      console.log("\n" + (lead.draftBody ?? ""));
+      break;
+    }
+    case "mark": {
+      const [leadId, status] = args;
+      const ok = store.setLeadStatus(leadId, status as never);
+      console.log(ok ? col(`✓ ${leadId} -> ${status}`, C.g) : col(`Brak leada ${leadId}`, C.r));
+      break;
+    }
+    default:
+      console.log(`RadarPL agent. Komendy:
+  once                 jeden cykl teraz
+  loop                 pętla autonomiczna (interwał z configu)
+  status               statystyki + zdrowie źródeł
+  leads [tenantId]     lista leadów
+  draft <leadId>       pokaż gotowy draft wiadomości
+  mark <leadId> <S>    ustaw status (WON/REJECTED/SENT/REPLIED)`);
+  }
+}
+
+function fail(msg: string) {
+  console.error(col(msg, C.r));
+  process.exitCode = 1;
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

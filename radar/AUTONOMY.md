@@ -1,0 +1,70 @@
+# RadarPL — tryb autonomiczny 🤖
+
+Agent kręci pełny cykl **bez Ciebie**: crawl → normalizacja → dedupe → enrich (AI)
+→ scoring → draft wiadomości → dostawa digestu. Stan trwa między uruchomieniami,
+cykle są idempotentne (ten sam sygnał nigdy nie tworzy dwóch leadów ani dwóch wysyłek).
+
+```
+źródła publiczne ─► fetch (file:/http) ─► enrich ─► score(ICP) ─► Store(JSON/Postgres)
+                                                          │
+                                          draft + digest ◄┘ ─► plik / webhook / Slack
+```
+
+## Co robi sam, a co wymaga Ciebie
+
+| Krok | Kto |
+|---|---|
+| Pobranie sygnałów ze źródeł | 🤖 agent |
+| Wzbogacenie (język, budżet, kategorie) | 🤖 agent (AI) |
+| Ocena intencji 0–100 wg Twojego ICP | 🤖 agent |
+| Wygenerowanie draftu pierwszej wiadomości | 🤖 agent |
+| Dostawa digestu (plik/webhook/Slack/e-mail) | 🤖 agent |
+| Dodanie/zmiana źródeł i ICP | 🧑 Ty (raz, w `config/tenants.json`) |
+| Faktyczne wysłanie oferty do klienta | 🧑 Ty (lub auto z bramką akceptacji) |
+
+Człowiek konfiguruje raz i akceptuje wysyłki. Reszta jest automatyczna.
+
+## 3 sposoby uruchomienia
+
+### 1) Chmura, za darmo — GitHub Actions (zalecane)
+Plik `.github/workflows/radar-autonomous.yml` odpala cykl **co 2h** na serwerach GitHuba.
+- Stan trzymany w cache między uruchomieniami, digesty jako artefakty.
+- Sekrety (opcjonalne): `OPENAI_API_KEY`, `RADAR_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`.
+- **Uwaga:** harmonogram `cron` firuje tylko gdy workflow jest na **gałęzi domyślnej** repo. Po zmerge'owaniu zacznie chodzić sam. Ręcznie: zakładka *Actions → Run workflow*.
+
+### 2) Lokalnie / VPS — pętla
+```bash
+cd radar
+node agent/cli.ts loop      # chodzi w nieskończoność, interwał z config/tenants.json
+```
+Na serwerze owiń w `systemd`/`pm2`, by wstawało po restarcie.
+
+### 3) n8n / dowolny cron
+```bash
+*/30 * * * *  cd /opt/radar && node agent/cli.ts once
+```
+
+## Sterowanie (minimum interwencji)
+```bash
+node agent/cli.ts once               # jeden cykl teraz
+node agent/cli.ts status             # statystyki + zdrowie źródeł
+node agent/cli.ts leads [tenantId]   # lista leadów wg intencji
+node agent/cli.ts draft <leadId>     # gotowy draft do skopiowania
+node agent/cli.ts mark <leadId> WON  # sprzężenie zwrotne (uczy scoring w fazie 2)
+```
+
+## Konfiguracja (jedyne, co robisz ręcznie)
+`config/tenants.json`:
+- **sources** — co crawlować (`file:` = fixture/test, `http(s)://` = realny feed; włącz `enabled: true`).
+- **tenants** — dla kogo (Ty/klienci): profil nadawcy + ICP (słowa kluczowe, wykluczenia, kategorie, budżet, języki).
+- **settings** — `intervalMinutes`, `threshold` (min. score na leada), `maxLeadsPerDigest`.
+
+## Persystencja
+- Tryb agenta: `radar/data/store.json` (zero zależności — działa od ręki).
+- Produkcja: ten sam interfejs na Postgres/Prisma (`apps/web`, `prisma/schema.prisma`).
+- Dedupe po `dedupeKey` (FNV-1a z tytułu + koszyk budżetu) — sygnał widziany raz nie wraca.
+
+## Bezpieczeństwo / etyka
+Tylko dane publiczne, własny `User-Agent`, timeouty, respekt ToS/robots.txt, preferencja
+oficjalnych feedów. Dostawa „best-effort" do webhooków, ale **plik digestu zawsze powstaje**
+(trwały ślad audytowy).

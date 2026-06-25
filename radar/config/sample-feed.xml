@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample job feed (fixture do testów/dry-run)</title>
+    <item>
+      <title>Szukam wykonawcy: sklep WooCommerce na WordPress</title>
+      <link>https://example.com/jobs/woo-1</link>
+      <description><![CDATA[Potrzebuję postawić sklep na WooCommerce z integracją płatności. Zlecę całość. Budżet: 6000 zł. Pilne, start w tym tygodniu.]]></description>
+      <pubDate>Wed, 24 Jun 2026 09:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Audyt SEO i pozycjonowanie sklepu internetowego</title>
+      <link>https://example.com/jobs/seo-2</link>
+      <description><![CDATA[Szukam specjalisty SEO do audytu i pozycjonowania sklepu. Budżet: 3000 zł miesięcznie. Kampania Google Ads mile widziana.]]></description>
+      <pubDate>Wed, 24 Jun 2026 10:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Landing page WordPress + Elementor</title>
+      <link>https://example.com/jobs/wp-3</link>
+      <description><![CDATA[Potrzebuję landing page na WordPress (Elementor). Prosty, jednostronicowy. Budżet: 1500 zł.]]></description>
+      <pubDate>Wed, 24 Jun 2026 11:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Automatyzacja procesów w n8n / integracja API</title>
+      <link>https://example.com/jobs/auto-4</link>
+      <description><![CDATA[Zlecę zbudowanie automatyzacji w n8n: integracja CRM z API. Budżet do uzgodnienia, ok. 4000 zł.]]></description>
+      <pubDate>Wed, 24 Jun 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Copywriting: 10 artykułów blogowych</title>
+      <link>https://example.com/jobs/copy-5</link>
+      <description><![CDATA[Szukam copywritera do napisania 10 artykułów SEO. Treści na bloga firmowego. Budżet: 2000 zł.]]></description>
+      <pubDate>Wed, 24 Jun 2026 12:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Pomoc przy przeprowadzce — wolontariat</title>
+      <link>https://example.com/jobs/noise-6</link>
+      <description><![CDATA[Szukam osób do pomocy przy przeprowadzce za darmo, wolontariat sąsiedzki.]]></description>
+      <pubDate>Wed, 24 Jun 2026 13:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
