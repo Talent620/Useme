@@ -13,8 +13,12 @@ sed -i.bak "s/export const VERSION = \".*\"/export const VERSION = \"$VERSION\"/
 mkdir -p dist
 ENTRY="agent/cli.ts"
 
-bun build "$ENTRY" --compile --minify --target=bun-linux-x64   --outfile dist/radar-linux
-bun build "$ENTRY" --compile --minify --target=bun-windows-x64 --outfile dist/radar-windows.exe
+# Optional deps reachable only via guarded dynamic imports (web/Postgres path) —
+# never in the CLI graph. Mark external so the binary build can't fail on them.
+EXT="--external @prisma/client --external ioredis --external next --external react --external react-dom --external @radar/core --external zod"
+
+bun build "$ENTRY" --compile --minify $EXT --target=bun-linux-x64   --outfile dist/radar-linux
+bun build "$ENTRY" --compile --minify $EXT --target=bun-windows-x64 --outfile dist/radar-windows.exe
 
 echo "Done:"
 ls -lh dist/radar-linux dist/radar-windows.exe
