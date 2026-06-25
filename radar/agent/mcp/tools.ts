@@ -3,7 +3,7 @@
 // callTool() builds a fresh Store per call to reflect external (CLI) changes.
 
 import { loadConfig } from "../config.ts";
-import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runNegotiate, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "../actions.ts";
 import { runCycle } from "../cycle.ts";
 import { storePath } from "../daemon.ts";
 import { buildTenant, previewForProfile, registerTenant } from "../onboarding.ts";
@@ -49,6 +49,7 @@ export const TOOLS: ToolDef[] = [
   { name: "radar_rank", description: "RL-lite ranking: czego agent nauczył się z realnych wyników (wartość per źródło/kanał/kategoria, EWMA bandit).", inputSchema: obj() },
   { name: "radar_price", description: "Dynamiczna wycena leada: rekomendowana cena + P(wygranej) + wartość oczekiwana (intent×historia×konkurencja, deterministycznie).", inputSchema: obj({ leadId: { type: "string" } }, ["leadId"]) },
   { name: "radar_price_train", description: "Skalibruj wagi modelu cenowego z realnej historii win/loss (regresja logistyczna, deterministyczna). System uczy się własnej elastyczności cenowej.", inputSchema: obj() },
+  { name: "radar_negotiate", description: "Doradca negocjacji: dla kontroferty klienta zwraca accept/counter/decline maksymalizując EV powyżej progu marży. Zwiększa rundę negocjacji leada i loguje do pamięci.", inputSchema: obj({ leadId: { type: "string" }, clientOffer: { type: "number", description: "kwota oferty klienta w zł" } }, ["leadId", "clientOffer"]) },
   { name: "radar_report", description: "Panel operatora: pełny stan biznesu (pipeline, P&L, prognoza, jakość, deliverable) + lista 'co trzeba zrobić'.", inputSchema: obj() },
   { name: "radar_board", description: "Zespół agentów (CEO/Sales/Research/Outreach/Execution/QA/Finance/Strategy) nad wspólną pamięcią — widoki + priorytety CEO.", inputSchema: obj() },
   { name: "radar_finance", description: "Agent finansowy: P&L, MRR, marża, CAC, LTV, ROI.", inputSchema: obj() },
@@ -179,6 +180,11 @@ export async function callTool(name: string, args: unknown): Promise<ToolResult>
 
     case "radar_price_train":
       return { text: JSON.stringify(runPriceTrain(store), null, 2) };
+
+    case "radar_negotiate": {
+      const r = runNegotiate(store, arg<string>(args, "leadId") ?? "", arg<number>(args, "clientOffer") ?? 0);
+      return r ? { text: JSON.stringify(r, null, 2) } : { text: "brak leada", isError: true };
+    }
 
     case "radar_report":
       return { text: runReport(store, cfg, new Date().toISOString()).markdown };

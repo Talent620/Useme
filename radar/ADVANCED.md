@@ -53,6 +53,19 @@ Pełne sprzężenie zwrotne, w pełni autonomiczne:
   `agent/test/pricing-calibrate.test.ts` (nauka elastyczności, determinizm,
   persystencja wag, próbki z pamięci).
 
+## `negotiate.ts` — silnik negocjacji (doradca kontroferty)
+Dla kontroferty klienta zwraca decyzję **accept / counter / decline**
+maksymalizującą wartość oczekiwaną, nigdy nie schodząc poniżej progu marży.
+Ustępstwa monotoniczne po rundach (im dłużej, tym więcej ustępujemy);
+prawdopodobieństwo akceptacji kontroferty modelowane logistyką, przechylane
+historycznym sukcesem negocjacji. Deterministyczne, bez LLM.
+- `negotiate(input)` → `{action, price, acceptProbability, expectedValue, floor, rationale}`,
+  `floorPrice(cost, minMargin)`, `acceptProbability(counter, offer, target, hist)`,
+  `DEFAULT_NEGOTIATION`. Akcja: `runNegotiate(store, leadId, clientOffer)` — zwiększa
+  rundę negocjacji leada i loguje obie strony do `Memory.recordNegotiation`.
+- Walk-away gdy oferta poniżej kosztu i mało prawdopodobne dojście do progu.
+  Testy: `agent/test/negotiate.test.ts` (próg, ustępstwa, EV, walk-away, rundy).
+
 ## `finance.ts` — agent finansowy (CFO)
 Pełna ekonomia: P&L, MRR, marża, ROI, **CAC, LTV, LTV/CAC**, prognoza przychodu.
 - `financials(facts, tenants, opts)`, `revenueForecast(mrr, months, growth)`.
@@ -77,12 +90,12 @@ istniejącymi silnikami.
 - `boardroom(store, cfg, now, memory?)`.
 
 ## Sterowanie
-- CLI: `board`, `finance`, `crm`, `rank`, `price <leadId>`, `price-train`
-  (+ `mark` karmi pamięć i bandita).
+- CLI: `board`, `finance`, `crm`, `rank`, `price <leadId>`, `price-train`,
+  `negotiate <id> <kwota>` (+ `mark` karmi pamięć i bandita).
 - MCP: `radar_board`, `radar_finance`, `radar_crm`, `radar_rank`, `radar_price`,
-  `radar_price_train` (łącznie 24 narzędzia).
+  `radar_price_train`, `radar_negotiate` (łącznie 25 narzędzi).
 - Akcje współdzielone: `runBoard`, `runFinance`, `runCrm`, `runRank`, `runPrice`,
-  `runPriceTrain`, `recordToMemory`.
+  `runPriceTrain`, `runNegotiate`, `recordToMemory`.
 
 ## Zasady projektowe (utrzymane)
 Pełna kompatybilność wsteczna · zero atrap/TODO · każda funkcja z testami

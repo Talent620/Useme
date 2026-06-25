@@ -33,7 +33,7 @@ node agent/mcp/server.ts        # lub: pnpm mcp
 ```
 Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 
-## Narzędzia (24)
+## Narzędzia (25)
 
 | Narzędzie | Działanie |
 |---|---|
@@ -57,6 +57,7 @@ Przykład gotowy do skopiowania: [`mcp.example.json`](./mcp.example.json).
 | `radar_rank` | RL-lite: czego agent nauczył się z wyników (wartość per źródło/kanał/kategoria) |
 | `radar_price` | dynamiczna wycena leada: cena + P(wygranej) + wartość oczekiwana |
 | `radar_price_train` | kalibracja wag modelu cenowego z historii win/loss (elastyczność cenowa) |
+| `radar_negotiate` | doradca kontroferty: accept/counter/decline z EV i progiem marży |
 | `radar_report` | panel operatora: pełny stan + lista 'co trzeba zrobić' |
 | `radar_board` | zespół agentów (CEO/Sales/.../Finance) + priorytety CEO |
 | `radar_finance` | agent finansowy: P&L, MRR, CAC, LTV, ROI |

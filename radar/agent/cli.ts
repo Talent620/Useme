@@ -9,7 +9,7 @@
 //   node agent/cli.ts mark <leadId> <STATUS>   # WON/REJECTED/SENT...
 
 import { DEFAULT_LEARN, loadConfig } from "./config.ts";
-import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
+import { recordToMemory, runBoard, runCrm, runExecute, runExecuteLead, runFinance, runForecast, runNegotiate, runPrice, runPriceTrain, runQualityTrain, runRank, runReport, runSend, runStrategy, runTrain } from "./actions.ts";
 import { buildTenant, previewForProfile, registerTenant } from "./onboarding.ts";
 import { VERSION } from "./version.ts";
 import { applyStagedUpdate, checkAndStage } from "./updater.ts";
@@ -308,6 +308,22 @@ async function main() {
       console.log();
       break;
     }
+    case "negotiate": {
+      const leadId = args[0] ?? "";
+      const offer = Number(args[1]);
+      if (!leadId || !Number.isFinite(offer)) return fail("Użycie: negotiate <leadId> <ofertaKlienta>");
+      const r = runNegotiate(store, leadId, offer);
+      if (!r) return fail(`Brak leada ${leadId}`);
+      const ac = r.action === "accept" ? C.g : r.action === "counter" ? C.y : C.r;
+      const label = r.action === "accept" ? "AKCEPTUJ" : r.action === "counter" ? "KONTROFERTA" : "ODPUŚĆ";
+      console.log(col(`\n  Negocjacje — runda ${r.round} (lead ${leadId})\n`, C.b));
+      console.log(`  Nasza cena: ${r.ourPrice} zł  ·  Oferta klienta: ${r.clientOffer} zł  ·  Próg (floor): ${r.floor} zł`);
+      console.log(`  Decyzja:    ${col(label, ac)}${r.price ? ` → ${col(r.price + " zł", C.b)}` : ""}${r.acceptProbability ? col(`  (akcept. ${Math.round(r.acceptProbability * 100)}%)`, C.dim) : ""}`);
+      console.log(`  EV:         ${col(r.expectedValue + " zł", r.expectedValue >= 0 ? C.g : C.r)}`);
+      console.log(col(`  ${r.rationale}`, C.dim));
+      console.log();
+      break;
+    }
     case "price-train": {
       const r = runPriceTrain(store);
       console.log(col("\n  Kalibracja modelu cenowego z historii win/loss\n", C.b));
@@ -422,6 +438,7 @@ async function main() {
   rank                 RL-lite: czego agent nauczył się z wyników (źródła/kanały/kategorie)
   price <leadId>       rekomendowana cena + P(wygranej) + wartość oczekiwana
   price-train          skalibruj wagi modelu cenowego z historii win/loss (auto co cykl)
+  negotiate <id> <kwota>  doradca kontroferty (accept/counter/decline, EV + próg)
   report               panel operatora: pełny stan + co trzeba zrobić
   train                naucz modele scoringu z wyników (WON/LOST)
   onboard --email .. --headline ".."   auto-profil + proof-of-value [--register]

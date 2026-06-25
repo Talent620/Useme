@@ -8,6 +8,7 @@ import { trainModel } from "../packages/core/src/index.ts";
 import { DEFAULT_EXECUTION, DEFAULT_LEARN, DEFAULT_OUTREACH, DEFAULT_STRATEGY, ROOT, strategyOverridesPath, type AgentConfig } from "./config.ts";
 import { computeFunnel, recommend, DEFAULT_COSTS, type Funnel, type Recommendation } from "./strategy.ts";
 import { recommendBid, competitionScore, calibrateWeights, DEFAULT_WEIGHTS, type CalibrationResult, type PriceWeights } from "./pricing.ts";
+import { negotiate, type NegotiationDecision } from "./negotiate.ts";
 import { forecast, prealloc, type Forecast, type PreallocRec } from "./forecast.ts";
 import { buildReport } from "./report.ts";
 import { memoryPath } from "./config.ts";
@@ -271,6 +272,42 @@ export function runPrice(store: Store, leadId: string): PriceResult | null {
     marginPct: bid.marginPct,
     basis: { score: lead.score, histWinRate: hist.rate, histSamples: hist.n, competition: competitionScore(competitors) },
   };
+}
+
+export interface NegotiateResult extends NegotiationDecision {
+  leadId: string;
+  round: number;
+  ourPrice: number;
+  clientOffer: number;
+}
+
+/**
+ * Advise on a client counter-offer for a lead: accept / counter / decline,
+ * maximizing EV above a margin floor. Advances the lead's negotiation round and
+ * logs both sides into long-term memory. Deterministic — no LLM.
+ */
+export function runNegotiate(store: Store, leadId: string, clientOffer: number): NegotiateResult | null {
+  const lead = store.findLead(leadId);
+  if (!lead) return null;
+  const ourPrice = lead.recommendedPrice ?? lead.signalBudget ?? Math.max(clientOffer, Math.round(DEFAULT_COSTS.perExecution / 0.5));
+  const category = lead.signalCategories?.[0] ?? "(brak)";
+  const mem = new Memory(memoryPath());
+  const hist = mem.winRate({ category });
+  const round = store.bumpNegotiation(leadId, clientOffer);
+  const decision = negotiate({
+    ourPrice,
+    clientOffer,
+    cost: DEFAULT_COSTS.perExecution,
+    round,
+    histWinRate: hist.n >= 3 ? hist.rate : 0.5,
+  });
+  const at = new Date().toISOString();
+  mem.recordNegotiation({ leadId, from: "client", price: clientOffer, at });
+  if (decision.action !== "decline") {
+    mem.recordNegotiation({ leadId, from: "us", price: decision.price, note: decision.action, at });
+  }
+  store.save();
+  return { ...decision, leadId, round, ourPrice, clientOffer };
 }
 
 /** Build the operator dashboard and persist it to data/report.md. */

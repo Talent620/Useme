@@ -42,6 +42,9 @@ export interface StoredLead extends Lead {
   // Pricing intelligence (computed at lead creation).
   recommendedPrice?: number;
   winProbability?: number;
+  // Negotiation state (advanced by each counter-offer round).
+  negotiationRound?: number;
+  lastClientOffer?: number;
   // Autonomous execution state.
   executionStatus?: "none" | "auto" | "review";
   executionConfidence?: number;
@@ -274,6 +277,16 @@ export class Store {
   }
   rankedArms(ns: string) {
     return rank(this.getRankTable(ns));
+  }
+
+  /** Advance a lead's negotiation: record the client's latest offer, return the
+   * new (1-based) round number. Idempotent persistence handled by caller. */
+  bumpNegotiation(leadId: string, clientOffer: number): number {
+    const l = this.db.leads.find((x) => x.id === leadId);
+    if (!l) return 0;
+    l.negotiationRound = (l.negotiationRound ?? 0) + 1;
+    l.lastClientOffer = clientOffer;
+    return l.negotiationRound;
   }
 
   getQualityModel(): QualityModel | undefined {
